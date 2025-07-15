@@ -1,0 +1,17 @@
+streamlit==1.46.1
+pandas==2.2.3
+llama-index==0.12.48
+llama-index-core==0.12.48
+llama-index-llms-ollama==0.6.2
+llama-index-embeddings-ollama==0.6.0
+llama-index-readers-file==0.4.11
+openpyxl==3.1.2
+plotly==5.22.0
+matplotlib==3.8.4
+sqlalchemy==2.0.30
+pymysql==1.1.0
+cx_oracle==8.3.0
+pyodbc==5.1.0
+duckdb==0.10.2
+psycopg2-binary==2.9.9
+python-dotenv==1.0.1
