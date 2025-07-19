@@ -1,0 +1,228 @@
+---
+title: 'Security & Privacy'
+description: 'How TableAI keeps your data safe and secure'
+---
+
+## Privacy-First Design
+
+TableAI is built with privacy and security as core principles. Your data never leaves your machine, ensuring complete control and confidentiality.
+
+## Local Processing
+
+<CardGroup cols={2}>
+  <Card
+    title="Local AI Models"
+    icon="microchip"
+  >
+    All AI processing uses locally-running Ollama models. No data sent to external APIs.
+  </Card>
+  <Card
+    title="Offline Capable"
+    icon="wifi-slash"
+  >
+    Works completely offline once models are downloaded. No internet required for analysis.
+  </Card>
+  <Card
+    title="Your Hardware"
+    icon="server"
+  >
+    Runs entirely on your own machine using your computing resources.
+  </Card>
+  <Card
+    title="No Telemetry"
+    icon="eye-slash"
+  >
+    No usage tracking, analytics, or data collection of any kind.
+  </Card>
+</CardGroup>
+
+## Code Execution Security
+
+TableAI implements multiple layers of security for AI-generated code execution:
+
+### Sandboxed Environment
+
+```python
+# Example of security filtering
+forbidden_patterns = [
+    r'os\.',           # Operating system access
+    r'subprocess',     # Process execution
+    r'open\(',         # File operations
+    r'exec\(',         # Code execution
+    r'eval\(',         # Dynamic evaluation
+    r'import sys',     # System module
+    r'import socket',  # Network access
+    r'requests',       # HTTP requests
+    r'urllib'          # URL operations
+]
+```
+
+### Safe Execution Context
+
+<Steps>
+  <Step title="Code Sanitization">
+    All AI-generated code is scanned and cleaned before execution
+  </Step>
+  <Step title="Limited Scope">
+    Code runs in isolated environment with restricted variable access
+  </Step>
+  <Step title="Timeout Protection">
+    Execution is limited by time to prevent infinite loops
+  </Step>
+  <Step title="Error Handling">
+    Comprehensive error catching prevents crashes and data exposure
+  </Step>
+</Steps>
+
+## Data Protection
+
+### File Handling
+
+<AccordionGroup>
+  <Accordion title="Temporary Storage">
+    - Files are stored in secure temporary directories
+    - Automatic cleanup after processing
+    - No permanent storage of user data
+  </Accordion>
+  
+  <Accordion title="Memory Management">
+    - Data loaded into memory only when needed
+    - Automatic garbage collection
+    - No data persistence between sessions
+  </Accordion>
+  
+  <Accordion title="Access Control">
+    - Read-only access to uploaded files
+    - No modification of original data
+    - Isolated processing environment
+  </Accordion>
+</AccordionGroup>
+
+### Database Connections
+
+<Warning>
+**Connection Security**: Database credentials are handled securely and not logged or stored permanently.
+</Warning>
+
+- Connections are established per-session only
+- No credential caching or storage
+- Support for encrypted connections (SSL/TLS)
+- Read-only access recommended
+
+## Network Security
+
+<Tip>
+**Air-Gapped Operation**: TableAI can operate completely disconnected from the internet once initial setup is complete.
+</Tip>
+
+### No External Dependencies
+
+- ✅ Local AI models (Ollama)
+- ✅ Local web interface (Streamlit)
+- ✅ Local data processing (pandas)
+- ❌ No cloud API calls
+- ❌ No external model services
+- ❌ No data uploads
+
+### Firewall Friendly
+
+- Only uses local ports (default: 8501)
+- No outbound connections required
+- Compatible with strict network policies
+
+## Compliance & Standards
+
+### Data Residency
+
+<CardGroup cols={1}>
+  <Card
+    title="Complete Data Residency"
+    icon="home"
+  >
+    Your data never leaves your infrastructure. Perfect for organizations with strict data residency requirements.
+  </Card>
+</CardGroup>
+
+### Industry Standards
+
+- **GDPR Compliant**: No personal data processing by third parties
+- **HIPAA Ready**: Suitable for healthcare data with proper infrastructure
+- **SOC 2 Compatible**: Meets security and availability criteria
+- **ISO 27001 Aligned**: Follows information security best practices
+
+## Security Best Practices
+
+### For Users
+
+<Steps>
+  <Step title="Secure Environment">
+    Run TableAI on a secure, updated system with appropriate access controls
+  </Step>
+  <Step title="Database Security">
+    Use read-only database connections when possible
+  </Step>
+  <Step title="Regular Updates">
+    Keep TableAI and its dependencies updated
+  </Step>
+  <Step title="Monitor Logs">
+    Review application logs for any unusual activity
+  </Step>
+</Steps>
+
+### For Organizations
+
+<AccordionGroup>
+  <Accordion title="Infrastructure Security">
+    - Deploy on secure, hardened systems
+    - Implement proper network segmentation
+    - Use encrypted storage for sensitive data
+    - Regular security assessments
+  </Accordion>
+  
+  <Accordion title="Access Management">
+    - Control who can access TableAI
+    - Implement proper authentication
+    - Monitor user activities
+    - Regular access reviews
+  </Accordion>
+  
+  <Accordion title="Data Governance">
+    - Define data classification policies
+    - Implement data handling procedures
+    - Regular compliance audits
+    - Incident response planning
+  </Accordion>
+</AccordionGroup>
+
+## Vulnerability Reporting
+
+If you discover a security vulnerability in TableAI:
+
+<Steps>
+  <Step title="Report Privately">
+    Email security issues to: security@tableai.com (if applicable)
+  </Step>
+  <Step title="Include Details">
+    Provide reproduction steps and impact assessment
+  </Step>
+  <Step title="Responsible Disclosure">
+    Allow time for fixes before public disclosure
+  </Step>
+</Steps>
+
+## Security Auditing
+
+TableAI includes built-in security logging:
+
+```python
+# Security events are logged
+logger.info("AI code cleaned for safety")
+logger.warning("Dangerous pattern blocked in generated code")
+logger.error("Code execution failed - potential security issue")
+```
+
+Regular security reviews of:
+- Code execution patterns
+- File access attempts
+- Network connection attempts
+- Error patterns that might indicate attacks

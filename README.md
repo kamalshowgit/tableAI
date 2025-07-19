@@ -93,6 +93,51 @@ The app will open in your browser at [http://localhost:8501](http://localhost:85
 
 ---
 
+## Documentation
+
+TableAI includes comprehensive documentation that can be viewed locally using Mintlify.
+
+### Running Documentation Locally
+
+1. **Install Node.js** (if not already installed):
+   ```bash
+   # On macOS with Homebrew
+   brew install node
+   
+   # Or download from https://nodejs.org/
+   ```
+
+2. **Install Mintlify CLI globally:**
+   ```bash
+   npm install -g mintlify
+   ```
+
+3. **Start the documentation server:**
+   ```bash
+   # From the project root directory
+   mintlify dev
+   ```
+
+4. **View documentation:**
+   - Open your browser to the URL shown in the terminal (usually `http://localhost:3000`)
+   - Browse through the complete documentation including:
+     - Getting Started Guide
+     - Feature Documentation
+     - API Reference
+     - Deployment Guide
+     - Troubleshooting
+
+### Documentation Contents
+
+The `docs/` folder contains:
+- **Introduction & Quickstart** - Get up and running quickly
+- **Feature Guides** - Detailed explanations of AI analyst, data upload, and database connectivity
+- **API Reference** - Complete function and method documentation
+- **Deployment Guide** - Production deployment strategies
+- **Troubleshooting** - Common issues and solutions
+
+---
+
 ## Usage
 
 - **Upload Data:** Use the landing page to upload a file or connect to a database.

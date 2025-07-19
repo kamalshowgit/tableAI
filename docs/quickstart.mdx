@@ -1,0 +1,138 @@
+---
+title: 'Quickstart'
+description: 'Start analyzing your data with TableAI in under 5 minutes'
+---
+
+## Installation & Setup
+
+<Steps>
+  <Step title="Install Dependencies">
+    Make sure you have Python 3.8+ and the required packages:
+    ```bash
+    pip install -r requirements.txt
+    ```
+  </Step>
+  <Step title="Install Ollama">
+    Download and install Ollama from [ollama.ai](https://ollama.ai)
+    ```bash
+    # Pull the Mistral model
+    ollama pull mistral
+    ```
+  </Step>
+  <Step title="Configure Environment">
+    Create a `.env` file (copy from `.env.example`):
+    ```bash
+    cp .env.example .env
+    ```
+    
+    Edit `.env` to set your preferred models:
+    ```env
+    OLLAMA_MODEL=mistral
+    OLLAMA_EMBED_MODEL=mistral
+    ```
+  </Step>
+  <Step title="Run TableAI">
+    Start the application:
+    ```bash
+    streamlit run app.py
+    ```
+  </Step>
+</Steps>
+
+## First Analysis
+
+### Option 1: Upload a File
+
+<Steps>
+  <Step title="Choose File">
+    Click the **"Upload File"** tab and select your data file (CSV, Excel, etc.)
+  </Step>
+  <Step title="Preview Data">
+    Review the data preview to ensure it loaded correctly
+  </Step>
+  <Step title="Ask the Analyst">
+    Click **"Ask the analyst"** to start your AI conversation
+  </Step>
+  <Step title="Start Asking">
+    Try questions like:
+    - "What are the main statistics of this dataset?"
+    - "Show me a histogram of the price column"
+    - "Find correlations between numeric columns"
+  </Step>
+</Steps>
+
+### Option 2: Connect to Database
+
+<Steps>
+  <Step title="Select Database Type">
+    Click **"Connect SQL DB"** and choose your database type
+  </Step>
+  <Step title="Enter Connection String">
+    Provide your database connection URI:
+    ```
+    postgresql://user:password@localhost:5432/dbname
+    sqlite:///path/to/your/database.db
+    ```
+  </Step>
+  <Step title="Select Table">
+    Choose which table to analyze from the dropdown
+  </Step>
+  <Step title="Start Analysis">
+    Begin asking questions about your data
+  </Step>
+</Steps>
+
+## Example Questions
+
+Here are some example questions you can ask the AI analyst:
+
+<AccordionGroup>
+  <Accordion title="Basic Statistics">
+    - "What's the summary statistics for all numeric columns?"
+    - "How many rows and columns does this dataset have?"
+    - "Show me the data types of each column"
+  </Accordion>
+  
+  <Accordion title="Data Exploration">
+    - "What are the unique values in the category column?"
+    - "Show me the top 10 records sorted by sales"
+    - "Find missing values in the dataset"
+  </Accordion>
+  
+  <Accordion title="Visualizations">
+    - "Create a bar chart of sales by region"
+    - "Show me a scatter plot of price vs quantity"
+    - "Generate a correlation heatmap"
+  </Accordion>
+  
+  <Accordion title="Analysis & Insights">
+    - "Calculate the average revenue by month"
+    - "Find the most profitable products"
+    - "Group sales by category and show totals"
+  </Accordion>
+</AccordionGroup>
+
+## Tips for Better Results
+
+<Tip>
+**Be Specific**: Instead of "analyze this data", try "show me the average sales by product category"
+</Tip>
+
+<Tip>
+**Use Column Names**: Reference actual column names in your questions for more accurate results
+</Tip>
+
+<Tip>
+**Start Simple**: Begin with basic questions and gradually ask more complex analysis questions
+</Tip>
+
+<Warning>
+**Clean Data**: Ensure your data is properly formatted with clear column headers for best results
+</Warning>
+
+## Next Steps
+
+- Learn about [supported file formats](/guides/file-formats)
+- Set up [database connections](/guides/database-setup)
+- Explore [advanced features](/features/ai-analyst)
+- Check [troubleshooting guide](/guides/troubleshooting) if you encounter issues

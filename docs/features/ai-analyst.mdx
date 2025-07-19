@@ -1,0 +1,597 @@
+---
+title: 'AI Data Analyst'
+description: 'Deep dive into TableAI AI-powered data analysis capabilities'
+---
+
+## Overview
+
+TableAI's AI Data Analyst is the core feature that transforms natural language questions into executable code and meaningful insights. Powered by Ollama and LlamaIndex, it provides intelligent, context-aware data analysis.
+
+## Architecture Overview
+
+### Core Components
+
+<CardGroup cols={2}>
+  <Card
+    title="LLM Engine"
+    icon="brain"
+  >
+    Ollama-based language models for code generation and analysis
+  </Card>
+  <Card
+    title="Embedding Model"
+    icon="vector-square"
+  >
+    Vector embeddings for context understanding and retrieval
+  </Card>
+  <Card
+    title="Code Executor"
+    icon="play"
+  >
+    Secure sandboxed environment for running generated code
+  </Card>
+  <Card
+    title="Safety Layer"
+    icon="shield-check"
+  >
+    Multi-layer security system for code sanitization
+  </Card>
+</CardGroup>
+
+### Processing Pipeline
+
+<Steps>
+  <Step title="Question Analysis">
+    User's natural language question is processed and contextualized
+  </Step>
+  <Step title="Code Generation">
+    LLM generates Python/SQL code based on data schema and question
+  </Step>
+  <Step title="Code Sanitization">
+    Generated code is cleaned and validated for security
+  </Step>
+  <Step title="Safe Execution">
+    Code runs in controlled environment with error handling
+  </Step>
+  <Step title="Result Rendering">
+    Output is formatted and displayed with appropriate visualizations
+  </Step>
+</Steps>
+
+## AI Model Management
+
+### Cached Model Loading
+
+TableAI uses Streamlit's caching system for optimal performance:
+
+```python
+@st.cache_resource
+def get_llm():
+    """Get cached LLM instance for better performance."""
+    return Ollama(model=OLLAMA_MODEL, request_timeout=120)
+
+@st.cache_resource 
+def get_embed_model():
+    """Get cached embedding model instance for better performance."""
+    return OllamaEmbedding(model_name=OLLAMA_EMBED_MODEL)
+```
+
+**Benefits:**
+- ✅ One-time model initialization
+- ✅ Faster response times
+- ✅ Memory efficiency
+- ✅ Automatic cache invalidation
+
+### Model Configuration
+
+<AccordionGroup>
+  <Accordion title="Primary LLM Models">
+    **Mistral (Default)**
+    - Balanced performance and accuracy
+    - Good for general data analysis
+    - Efficient code generation
+    
+    **Code Llama**
+    - Specialized for code generation
+    - Better syntax accuracy
+    - Optimized for Python/SQL
+    
+    **Llama 2**
+    - General-purpose model
+    - Good reasoning capabilities
+    - Reliable for complex queries
+  </Accordion>
+  
+  <Accordion title="Embedding Models">
+    **Mistral Embeddings**
+    - Fast vector generation
+    - Good semantic understanding
+    - Lightweight processing
+    
+    **Configuration:**
+    ```bash
+    # .env configuration
+    OLLAMA_MODEL=mistral
+    OLLAMA_EMBED_MODEL=mistral
+    ```
+  </Accordion>
+  
+  <Accordion title="Model Parameters">
+    ```python
+    # LLM Configuration
+    llm = Ollama(
+        model=OLLAMA_MODEL,
+        request_timeout=120,    # 2-minute timeout
+        temperature=0.1,        # Low randomness for consistent code
+        max_tokens=2048        # Maximum response length
+    )
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Question Processing System
+
+### Context Building
+
+The AI builds rich context from your data:
+
+```python
+def build_context(df: pd.DataFrame, user_question: str) -> str:
+    # Data schema analysis
+    schema = "\n".join([f"- {col}: {str(dtype)}" 
+                       for col, dtype in zip(df.columns, df.dtypes)])
+    
+    # Sample data for understanding
+    sample_rows = df.head(3).to_dict(orient="records")
+    
+    # Instruction templates
+    if is_database_source():
+        instruction = """
+        Write SQL code to answer the question using table 'data'.
+        Return only the SQL code and a brief explanation.
+        """
+    else:
+        instruction = """
+        Write Python (pandas) code using DataFrame 'df'.
+        Return only the code and a brief explanation.
+        """
+    
+    return f"""
+    Data schema: {schema}
+    Sample rows: {sample_rows}
+    User question: {user_question}
+    {instruction}
+    """
+```
+
+### Document Indexing
+
+LlamaIndex creates searchable document indexes:
+
+```python
+# Create temporary document for indexing
+with tempfile.NamedTemporaryFile(delete=False, suffix=".txt", mode="w") as f:
+    f.write(context_text)
+    doc_path = f.name
+
+# Load and index documents
+documents = SimpleDirectoryReader(input_files=[doc_path]).load_data()
+index = VectorStoreIndex.from_documents(documents, embed_model=embed_model)
+
+# Create query engine
+query_engine = index.as_query_engine(llm=llm)
+ai_response = query_engine.query(user_question)
+```
+
+## Code Generation & Execution
+
+### Code Detection & Parsing
+
+The system intelligently detects different code types:
+
+```python
+def parse_ai_response(ai_response: str) -> tuple[str, str]:
+    code = None
+    code_lang = 'python'
+    
+    # Detect code blocks
+    if "```python" in str(ai_response):
+        code = str(ai_response).split("```python")[1].split("```", 1)[0].strip()
+        code_lang = 'python'
+    elif "```sql" in str(ai_response):
+        code = str(ai_response).split("```sql")[1].split("```", 1)[0].strip()
+        code_lang = 'sql'
+    else:
+        # Try to detect plain SQL
+        sql_pattern = r"^\s*SELECT .* FROM .*;?\s*$"
+        if re.match(sql_pattern, str(ai_response), re.IGNORECASE):
+            code = str(ai_response).strip()
+            code_lang = 'sql'
+        else:
+            code = str(ai_response).strip()
+            code_lang = 'python'
+    
+    return code, code_lang
+```
+
+### Security & Sanitization
+
+Multi-layer security system protects against malicious code:
+
+```python
+def clean_ai_code(code: str) -> str:
+    """Post-process AI-generated code for safety and correctness."""
+    
+    # Fix common matplotlib errors
+    code = re.sub(r'labels\s*=', 'label=', code)
+    
+    # Remove dangerous patterns
+    forbidden = [
+        r'os\.',           # OS operations
+        r'subprocess',     # Process execution
+        r'open\(',         # File operations
+        r'exec\(',         # Code execution
+        r'eval\(',         # Dynamic evaluation
+        r'import sys',     # System imports
+        r'import socket',  # Network access
+        r'requests',       # HTTP requests
+        r'urllib'          # URL operations
+    ]
+    
+    for pattern in forbidden:
+        code = re.sub(pattern, '# BLOCKED', code)
+    
+    return code.strip()
+```
+
+### Execution Environment
+
+Code runs in a controlled, sandboxed environment:
+
+<CodeGroup>
+
+```python Python Execution
+# Prepare execution environment
+local_vars = {"df": df}  # Only provide DataFrame
+
+# Execute with output capture
+with contextlib.redirect_stdout(io.StringIO()) as f:
+    exec(cleaned_code, {}, local_vars)
+    exec_output = f.getvalue()
+
+# Get result
+result = local_vars.get("result", None)
+```
+
+```python SQL Execution
+# Extract clean SQL statement
+sql_lines = [l.strip() for l in code.splitlines() 
+            if re.match(r'^(SELECT|UPDATE|DELETE|INSERT)', 
+                       l.strip(), re.IGNORECASE)]
+sql_code = sql_lines[0] if sql_lines else code.strip()
+
+# Execute against database
+with engine.connect() as conn:
+    result_df = pd.read_sql_query(sql_code, conn)
+```
+
+```python Error Handling
+try:
+    # Execute code
+    result = execute_code(code, local_vars)
+except ValueError as ve:
+    if "Length mismatch" in str(ve):
+        # Handle DataFrame column issues
+        result = "Error: Column count mismatch"
+    elif "got an unexpected keyword argument" in str(ve):
+        # Handle function argument errors
+        result = "Error: Invalid function arguments"
+except TypeError as te:
+    # Handle type-related errors
+    result = f"Error: Type mismatch - {te}"
+```
+
+</CodeGroup>
+
+## Question Types & Examples
+
+### Basic Data Exploration
+
+<AccordionGroup>
+  <Accordion title="Dataset Overview">
+    **Questions:**
+    - "What are the dimensions of this dataset?"
+    - "Show me basic statistics for all columns"
+    - "What data types do I have?"
+    
+    **Generated Code:**
+    ```python
+    # Dataset dimensions
+    print(f"Dataset shape: {df.shape}")
+    print(f"Rows: {len(df)}, Columns: {len(df.columns)}")
+    
+    # Basic statistics
+    df.describe(include='all')
+    ```
+  </Accordion>
+  
+  <Accordion title="Missing Data Analysis">
+    **Questions:**
+    - "Are there any missing values?"
+    - "Which columns have the most null values?"
+    - "Show me missing data patterns"
+    
+    **Generated Code:**
+    ```python
+    # Missing values summary
+    missing_data = df.isnull().sum()
+    missing_percentage = (missing_data / len(df)) * 100
+    
+    result = pd.DataFrame({
+        'Missing_Count': missing_data,
+        'Missing_Percentage': missing_percentage
+    }).sort_values('Missing_Count', ascending=False)
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Data Analysis & Insights
+
+<AccordionGroup>
+  <Accordion title="Statistical Analysis">
+    **Questions:**
+    - "What's the correlation between price and quantity?"
+    - "Find outliers in the sales column"
+    - "Calculate the average revenue by category"
+    
+    **Generated Code:**
+    ```python
+    # Correlation analysis
+    correlation = df[['price', 'quantity']].corr()
+    
+    # Outlier detection using IQR
+    Q1 = df['sales'].quantile(0.25)
+    Q3 = df['sales'].quantile(0.75)
+    IQR = Q3 - Q1
+    outliers = df[(df['sales'] < Q1 - 1.5*IQR) | 
+                  (df['sales'] > Q3 + 1.5*IQR)]
+    
+    # Group analysis
+    avg_revenue = df.groupby('category')['revenue'].mean().sort_values(ascending=False)
+    ```
+  </Accordion>
+  
+  <Accordion title="Time Series Analysis">
+    **Questions:**
+    - "Show sales trends over time"
+    - "What's the monthly growth rate?"
+    - "Find seasonal patterns in the data"
+    
+    **Generated Code:**
+    ```python
+    # Convert to datetime
+    df['date'] = pd.to_datetime(df['date'])
+    
+    # Monthly aggregation
+    monthly_sales = df.groupby(df['date'].dt.to_period('M'))['sales'].sum()
+    
+    # Growth rate calculation
+    growth_rate = monthly_sales.pct_change() * 100
+    
+    # Plot trends
+    import matplotlib.pyplot as plt
+    fig, ax = plt.subplots(figsize=(12, 6))
+    monthly_sales.plot(ax=ax, title='Sales Trends Over Time')
+    ax.set_ylabel('Sales')
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Visualization Requests
+
+<AccordionGroup>
+  <Accordion title="Charts & Plots">
+    **Questions:**
+    - "Create a bar chart of sales by region"
+    - "Show me a histogram of customer ages"
+    - "Generate a scatter plot of price vs profit"
+    
+    **Generated Code:**
+    ```python
+    import matplotlib.pyplot as plt
+    
+    # Bar chart
+    sales_by_region = df.groupby('region')['sales'].sum()
+    fig, ax = plt.subplots(figsize=(10, 6))
+    sales_by_region.plot(kind='bar', ax=ax)
+    ax.set_title('Sales by Region')
+    ax.set_ylabel('Total Sales')
+    plt.xticks(rotation=45)
+    
+    # Histogram
+    fig, ax = plt.subplots()
+    df['age'].hist(bins=20, ax=ax)
+    ax.set_title('Distribution of Customer Ages')
+    
+    # Scatter plot
+    fig, ax = plt.subplots()
+    ax.scatter(df['price'], df['profit'], alpha=0.6)
+    ax.set_xlabel('Price')
+    ax.set_ylabel('Profit')
+    ax.set_title('Price vs Profit')
+    ```
+  </Accordion>
+  
+  <Accordion title="Advanced Visualizations">
+    **Questions:**
+    - "Create a correlation heatmap"
+    - "Show me a box plot of sales by category"
+    - "Generate a pivot table visualization"
+    
+    **Generated Code:**
+    ```python
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    
+    # Correlation heatmap
+    numeric_cols = df.select_dtypes(include=[np.number])
+    correlation_matrix = numeric_cols.corr()
+    
+    fig, ax = plt.subplots(figsize=(10, 8))
+    sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', ax=ax)
+    ax.set_title('Correlation Heatmap')
+    
+    # Box plot
+    fig, ax = plt.subplots(figsize=(12, 6))
+    df.boxplot(column='sales', by='category', ax=ax)
+    ax.set_title('Sales Distribution by Category')
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Error Handling & Recovery
+
+### Common Error Patterns
+
+<CodeGroup>
+
+```python Syntax Errors
+# AI generates invalid syntax
+try:
+    exec(code, {}, local_vars)
+except SyntaxError as se:
+    error_msg = (
+        "❌ <b>Error:</b> Invalid syntax in generated code.<br>"
+        "<b>Tip:</b> Try rephrasing your question more clearly.<br>"
+        f"<b>Code:</b> <pre>{code}</pre>"
+    )
+```
+
+```python Data Errors
+# DataFrame operations fail
+except ValueError as ve:
+    if "Length mismatch" in str(ve):
+        error_msg = (
+            "❌ <b>Error:</b> Column count mismatch.<br>"
+            "<b>Tip:</b> Check your data structure and try again."
+        )
+    elif "got an unexpected keyword argument" in str(ve):
+        error_msg = (
+            "❌ <b>Error:</b> Invalid function arguments.<br>"
+            "<b>Tip:</b> This often happens with plotting functions."
+        )
+```
+
+```python Type Errors
+# Type-related issues
+except TypeError as te:
+    if "agg function failed" in str(te):
+        error_msg = (
+            "❌ <b>Error:</b> Cannot aggregate non-numeric columns.<br>"
+            "<b>Tip:</b> Specify numeric columns for calculations."
+        )
+```
+
+</CodeGroup>
+
+### Recovery Strategies
+
+<Steps>
+  <Step title="Graceful Degradation">
+    Show partial results when possible, explain what succeeded
+  </Step>
+  <Step title="Helpful Error Messages">
+    Provide specific guidance on how to fix the issue
+  </Step>
+  <Step title="Alternative Suggestions">
+    Offer simpler or alternative analysis approaches
+  </Step>
+  <Step title="Context Preservation">
+    Maintain conversation state for follow-up questions
+  </Step>
+</Steps>
+
+## Performance Optimization
+
+### Response Time Improvements
+
+```python
+# Model caching eliminates initialization overhead
+@st.cache_resource
+def get_models():
+    return get_llm(), get_embed_model()
+
+# Efficient context building
+def build_minimal_context(df: pd.DataFrame, question: str) -> str:
+    # Use sample data instead of full dataset
+    sample_df = df.sample(min(100, len(df)))
+    return build_context(sample_df, question)
+```
+
+### Memory Management
+
+```python
+# Automatic cleanup
+def cleanup_temp_files():
+    for temp_file in temp_files:
+        try:
+            os.unlink(temp_file)
+        except FileNotFoundError:
+            pass
+
+# Efficient DataFrame operations
+def optimize_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+    # Downcast numeric types
+    for col in df.select_dtypes(include=['int64']):
+        df[col] = pd.to_numeric(df[col], downcast='integer')
+    
+    for col in df.select_dtypes(include=['float64']):
+        df[col] = pd.to_numeric(df[col], downcast='float')
+    
+    return df
+```
+
+## Best Practices
+
+### For Effective Questions
+
+<Tip>
+**Be Specific**: "Show average sales by region" vs "analyze sales"
+</Tip>
+
+<Tip>
+**Use Column Names**: Reference actual column names in your questions
+</Tip>
+
+<Tip>
+**Start Simple**: Begin with basic analysis before complex operations
+</Tip>
+
+<Tip>
+**Follow Up**: Build on previous results with follow-up questions
+</Tip>
+
+### For Developers
+
+<Warning>
+**Security First**: Always sanitize generated code before execution
+</Warning>
+
+<Warning>
+**Error Handling**: Implement comprehensive error catching and user feedback
+</Warning>
+
+<Warning>
+**Performance**: Monitor execution time and memory usage for large datasets
+</Warning>
+
+## Integration Points
+
+The AI Analyst integrates seamlessly with other TableAI components:
+
+- **Data Upload**: Automatically understands uploaded data structure
+- **Database Connections**: Generates appropriate SQL for different database types
+- **Visualization**: Creates charts and graphs based on analysis results
+- **Security**: Maintains safety standards throughout the analysis pipeline
+
+This creates a cohesive experience where users can move from data upload to insights without technical barriers.

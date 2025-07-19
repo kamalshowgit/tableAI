@@ -1,0 +1,1088 @@
+---
+title: 'Deployment Guide'
+description: 'Deploy TableAI to production environments'
+---
+
+## Deployment Overview
+
+TableAI can be deployed in various environments, from local development to cloud production. This guide covers different deployment strategies, configuration options, and best practices.
+
+## Deployment Options
+
+<CardGroup cols={2}>
+  <Card
+    title="Local Development"
+    icon="laptop"
+  >
+    Quick setup for development and testing
+  </Card>
+  <Card
+    title="Docker Container"
+    icon="docker"
+  >
+    Containerized deployment for consistency
+  </Card>
+  <Card
+    title="Cloud Platforms"
+    icon="cloud"
+  >
+    Scalable cloud deployment options
+  </Card>
+  <Card
+    title="Enterprise Setup"
+    icon="building"
+  >
+    Production-ready enterprise deployment
+  </Card>
+</CardGroup>
+
+## Local Development Setup
+
+### Quick Start
+
+<Steps>
+  <Step title="Clone Repository">
+    ```bash
+    git clone https://github.com/your-org/tableai.git
+    cd tableai
+    ```
+  </Step>
+  <Step title="Setup Environment">
+    ```bash
+    python -m venv venv
+    source venv/bin/activate  # Linux/Mac
+    # or
+    venv\Scripts\activate     # Windows
+    ```
+  </Step>
+  <Step title="Install Dependencies">
+    ```bash
+    pip install -r requirements.txt
+    ```
+  </Step>
+  <Step title="Configure Environment">
+    ```bash
+    cp .env.example .env
+    # Edit .env with your settings
+    ```
+  </Step>
+  <Step title="Start Application">
+    ```bash
+    streamlit run app.py
+    ```
+  </Step>
+</Steps>
+
+### Development Configuration
+
+```bash
+# .env.development
+DEBUG=true
+STREAMLIT_SERVER_PORT=8501
+STREAMLIT_SERVER_ADDRESS=localhost
+
+# AI Model Configuration
+OLLAMA_MODEL=mistral
+OLLAMA_EMBED_MODEL=mistral
+OLLAMA_HOST=http://localhost:11434
+
+# Database Configuration (Optional)
+DATABASE_TYPE=sqlite
+DATABASE_PATH=./dev_data.db
+
+# Security Settings
+ALLOWED_HOSTS=localhost,127.0.0.1
+SECRET_KEY=your-dev-secret-key
+```
+
+## Docker Deployment
+
+### Basic Docker Setup
+
+<AccordionGroup>
+  <Accordion title="Dockerfile">
+    ```dockerfile
+    # Dockerfile
+    FROM python:3.11-slim
+    
+    # Set working directory
+    WORKDIR /app
+    
+    # Install system dependencies
+    RUN apt-get update && apt-get install -y \
+        build-essential \
+        curl \
+        && rm -rf /var/lib/apt/lists/*
+    
+    # Copy requirements first for better caching
+    COPY requirements.txt .
+    RUN pip install --no-cache-dir -r requirements.txt
+    
+    # Copy application code
+    COPY . .
+    
+    # Create non-root user
+    RUN groupadd -r tableai && useradd -r -g tableai tableai
+    RUN chown -R tableai:tableai /app
+    USER tableai
+    
+    # Expose port
+    EXPOSE 8501
+    
+    # Health check
+    HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+        CMD curl -f http://localhost:8501/_stcore/health
+    
+    # Start application
+    CMD ["streamlit", "run", "app.py", "--server.port=8501", "--server.address=0.0.0.0"]
+    ```
+  </Accordion>
+  
+  <Accordion title="Docker Compose">
+    ```yaml
+    # docker-compose.yml
+    version: '3.8'
+    
+    services:
+      tableai:
+        build: .
+        ports:
+          - "8501:8501"
+        environment:
+          - OLLAMA_HOST=http://ollama:11434
+          - DATABASE_TYPE=postgresql
+          - DATABASE_HOST=postgres
+          - DATABASE_PORT=5432
+          - DATABASE_NAME=tableai
+          - DATABASE_USER=tableai
+          - DATABASE_PASSWORD=${DATABASE_PASSWORD}
+        depends_on:
+          - ollama
+          - postgres
+        volumes:
+          - ./data:/app/data
+          - ./logs:/app/logs
+        restart: unless-stopped
+        networks:
+          - tableai-network
+    
+      ollama:
+        image: ollama/ollama:latest
+        ports:
+          - "11434:11434"
+        volumes:
+          - ollama-data:/root/.ollama
+        restart: unless-stopped
+        networks:
+          - tableai-network
+        deploy:
+          resources:
+            reservations:
+              devices:
+                - driver: nvidia
+                  count: 1
+                  capabilities: [gpu]
+    
+      postgres:
+        image: postgres:15
+        environment:
+          - POSTGRES_DB=tableai
+          - POSTGRES_USER=tableai
+          - POSTGRES_PASSWORD=${DATABASE_PASSWORD}
+        volumes:
+          - postgres-data:/var/lib/postgresql/data
+          - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+        restart: unless-stopped
+        networks:
+          - tableai-network
+    
+      nginx:
+        image: nginx:alpine
+        ports:
+          - "80:80"
+          - "443:443"
+        volumes:
+          - ./nginx.conf:/etc/nginx/nginx.conf
+          - ./ssl:/etc/nginx/ssl
+        depends_on:
+          - tableai
+        restart: unless-stopped
+        networks:
+          - tableai-network
+    
+    volumes:
+      ollama-data:
+      postgres-data:
+    
+    networks:
+      tableai-network:
+        driver: bridge
+    ```
+  </Accordion>
+  
+  <Accordion title="Environment Configuration">
+    ```bash
+    # .env.docker
+    # Database Configuration
+    DATABASE_PASSWORD=your-secure-password
+    
+    # Security
+    SECRET_KEY=your-production-secret-key
+    
+    # SSL Configuration
+    SSL_CERT_PATH=/etc/nginx/ssl/cert.pem
+    SSL_KEY_PATH=/etc/nginx/ssl/key.pem
+    
+    # Monitoring
+    ENABLE_METRICS=true
+    LOG_LEVEL=INFO
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Docker Commands
+
+```bash
+# Build and start services
+docker-compose up -d
+
+# View logs
+docker-compose logs -f tableai
+
+# Scale application
+docker-compose up -d --scale tableai=3
+
+# Update application
+docker-compose build tableai
+docker-compose up -d tableai
+
+# Backup data
+docker exec postgres pg_dump -U tableai tableai > backup.sql
+
+# Clean up
+docker-compose down -v
+```
+
+## Cloud Platform Deployment
+
+### Streamlit Cloud
+
+<AccordionGroup>
+  <Accordion title="Streamlit Cloud Setup">
+    **Prerequisites:**
+    - GitHub repository with your code
+    - Streamlit Cloud account
+    - Requirements.txt file
+    
+    **Deployment Steps:**
+    1. Push code to GitHub repository
+    2. Connect repository to Streamlit Cloud
+    3. Configure environment variables
+    4. Deploy application
+    
+    **Configuration:**
+    ```toml
+    # .streamlit/config.toml
+    [server]
+    port = 8501
+    enableCORS = false
+    enableXsrfProtection = true
+    
+    [browser]
+    gatherUsageStats = false
+    
+    [theme]
+    primaryColor = "#FF6B35"
+    backgroundColor = "#FFFFFF"
+    secondaryBackgroundColor = "#F0F2F6"
+    textColor = "#262730"
+    ```
+    
+    **Secrets Management:**
+    ```toml
+    # .streamlit/secrets.toml (not committed to git)
+    OLLAMA_HOST = "https://your-ollama-endpoint.com"
+    DATABASE_URL = "postgresql://user:pass@host:port/db"
+    SECRET_KEY = "your-secret-key"
+    ```
+  </Accordion>
+  
+  <Accordion title="AWS Deployment">
+    **Using AWS ECS with Fargate:**
+    
+    ```json
+    {
+      "family": "tableai-task",
+      "networkMode": "awsvpc",
+      "requiresCompatibilities": ["FARGATE"],
+      "cpu": "1024",
+      "memory": "2048",
+      "executionRoleArn": "arn:aws:iam::account:role/ecsTaskExecutionRole",
+      "taskRoleArn": "arn:aws:iam::account:role/ecsTaskRole",
+      "containerDefinitions": [
+        {
+          "name": "tableai",
+          "image": "your-account.dkr.ecr.region.amazonaws.com/tableai:latest",
+          "portMappings": [
+            {
+              "containerPort": 8501,
+              "protocol": "tcp"
+            }
+          ],
+          "environment": [
+            {
+              "name": "OLLAMA_HOST",
+              "value": "https://your-ollama-endpoint.com"
+            }
+          ],
+          "secrets": [
+            {
+              "name": "DATABASE_PASSWORD",
+              "valueFrom": "arn:aws:secretsmanager:region:account:secret:tableai-db-password"
+            }
+          ],
+          "logConfiguration": {
+            "logDriver": "awslogs",
+            "options": {
+              "awslogs-group": "/ecs/tableai",
+              "awslogs-region": "us-west-2",
+              "awslogs-stream-prefix": "ecs"
+            }
+          }
+        }
+      ]
+    }
+    ```
+    
+    **AWS CLI Deployment:**
+    ```bash
+    # Build and push Docker image
+    aws ecr get-login-password --region us-west-2 | docker login --username AWS --password-stdin account.dkr.ecr.us-west-2.amazonaws.com
+    docker build -t tableai .
+    docker tag tableai:latest account.dkr.ecr.us-west-2.amazonaws.com/tableai:latest
+    docker push account.dkr.ecr.us-west-2.amazonaws.com/tableai:latest
+    
+    # Deploy to ECS
+    aws ecs register-task-definition --cli-input-json file://task-definition.json
+    aws ecs update-service --cluster tableai-cluster --service tableai-service --task-definition tableai-task
+    ```
+  </Accordion>
+  
+  <Accordion title="Google Cloud Platform">
+    **Using Cloud Run:**
+    
+    ```yaml
+    # cloudbuild.yaml
+    steps:
+      - name: 'gcr.io/cloud-builders/docker'
+        args: ['build', '-t', 'gcr.io/$PROJECT_ID/tableai:$COMMIT_SHA', '.']
+      - name: 'gcr.io/cloud-builders/docker'
+        args: ['push', 'gcr.io/$PROJECT_ID/tableai:$COMMIT_SHA']
+      - name: 'gcr.io/cloud-builders/gcloud'
+        args: 
+          - 'run'
+          - 'deploy'
+          - 'tableai'
+          - '--image=gcr.io/$PROJECT_ID/tableai:$COMMIT_SHA'
+          - '--platform=managed'
+          - '--region=us-central1'
+          - '--allow-unauthenticated'
+          - '--port=8501'
+          - '--memory=2Gi'
+          - '--cpu=1'
+          - '--set-env-vars=OLLAMA_HOST=https://your-ollama-endpoint.com'
+    ```
+    
+    **Deployment Commands:**
+    ```bash
+    # Enable required APIs
+    gcloud services enable cloudbuild.googleapis.com run.googleapis.com
+    
+    # Submit build
+    gcloud builds submit --config cloudbuild.yaml
+    
+    # Manual deployment
+    gcloud run deploy tableai \
+        --image gcr.io/PROJECT_ID/tableai:latest \
+        --platform managed \
+        --region us-central1 \
+        --allow-unauthenticated \
+        --port 8501 \
+        --memory 2Gi \
+        --cpu 1
+    ```
+  </Accordion>
+  
+  <Accordion title="Azure Container Instances">
+    ```yaml
+    # azure-container-instance.yaml
+    apiVersion: 2019-12-01
+    location: eastus
+    name: tableai-container-group
+    properties:
+      containers:
+      - name: tableai
+        properties:
+          image: your-registry.azurecr.io/tableai:latest
+          ports:
+          - port: 8501
+            protocol: TCP
+          environmentVariables:
+          - name: OLLAMA_HOST
+            value: https://your-ollama-endpoint.com
+          - name: DATABASE_PASSWORD
+            secureValue: your-secure-password
+          resources:
+            requests:
+              cpu: 1
+              memoryInGB: 2
+      osType: Linux
+      ipAddress:
+        type: Public
+        ports:
+        - protocol: tcp
+          port: 8501
+      restartPolicy: Always
+    ```
+    
+    **Azure CLI Deployment:**
+    ```bash
+    # Create resource group
+    az group create --name tableai-rg --location eastus
+    
+    # Deploy container
+    az container create \
+        --resource-group tableai-rg \
+        --file azure-container-instance.yaml
+    
+    # Get public IP
+    az container show \
+        --resource-group tableai-rg \
+        --name tableai-container-group \
+        --query ipAddress.ip \
+        --output tsv
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Production Configuration
+
+### Security Hardening
+
+<AccordionGroup>
+  <Accordion title="SSL/TLS Configuration">
+    ```nginx
+    # nginx.conf
+    events {
+        worker_connections 1024;
+    }
+    
+    http {
+        upstream tableai {
+            server tableai:8501;
+        }
+    
+        server {
+            listen 80;
+            server_name your-domain.com;
+            return 301 https://$server_name$request_uri;
+        }
+    
+        server {
+            listen 443 ssl http2;
+            server_name your-domain.com;
+    
+            ssl_certificate /etc/nginx/ssl/cert.pem;
+            ssl_certificate_key /etc/nginx/ssl/key.pem;
+            ssl_protocols TLSv1.2 TLSv1.3;
+            ssl_ciphers ECDHE-RSA-AES256-GCM-SHA512:DHE-RSA-AES256-GCM-SHA512;
+            ssl_prefer_server_ciphers off;
+    
+            # Security headers
+            add_header Strict-Transport-Security "max-age=63072000" always;
+            add_header X-Content-Type-Options nosniff;
+            add_header X-Frame-Options DENY;
+            add_header X-XSS-Protection "1; mode=block";
+    
+            # Rate limiting
+            limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
+            limit_req zone=api burst=20 nodelay;
+    
+            location / {
+                proxy_pass http://tableai;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                
+                # WebSocket support
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection "upgrade";
+                
+                # Timeouts
+                proxy_connect_timeout 60s;
+                proxy_send_timeout 60s;
+                proxy_read_timeout 60s;
+            }
+    
+            # File upload size limit
+            client_max_body_size 100M;
+        }
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Environment Security">
+    ```python
+    # security.py
+    import os
+    import secrets
+    from cryptography.fernet import Fernet
+    
+    class SecurityConfig:
+        """Production security configuration."""
+        
+        def __init__(self):
+            self.secret_key = os.getenv('SECRET_KEY') or secrets.token_urlsafe(32)
+            self.encryption_key = os.getenv('ENCRYPTION_KEY') or Fernet.generate_key()
+            self.allowed_hosts = os.getenv('ALLOWED_HOSTS', '').split(',')
+            self.enable_rate_limiting = os.getenv('ENABLE_RATE_LIMITING', 'true').lower() == 'true'
+        
+        def encrypt_sensitive_data(self, data: str) -> str:
+            """Encrypt sensitive data."""
+            f = Fernet(self.encryption_key)
+            return f.encrypt(data.encode()).decode()
+        
+        def decrypt_sensitive_data(self, encrypted_data: str) -> str:
+            """Decrypt sensitive data."""
+            f = Fernet(self.encryption_key)
+            return f.decrypt(encrypted_data.encode()).decode()
+    
+    # Rate limiting middleware
+    from functools import wraps
+    import time
+    from collections import defaultdict
+    
+    class RateLimiter:
+        def __init__(self, max_requests: int = 100, window: int = 3600):
+            self.max_requests = max_requests
+            self.window = window
+            self.requests = defaultdict(list)
+        
+        def is_allowed(self, client_ip: str) -> bool:
+            now = time.time()
+            # Clean old requests
+            self.requests[client_ip] = [req_time for req_time in self.requests[client_ip] 
+                                      if now - req_time < self.window]
+            
+            if len(self.requests[client_ip]) >= self.max_requests:
+                return False
+            
+            self.requests[client_ip].append(now)
+            return True
+    
+    # Apply security configuration
+    security_config = SecurityConfig()
+    rate_limiter = RateLimiter()
+    ```
+  </Accordion>
+  
+  <Accordion title="Database Security">
+    ```python
+    # database_security.py
+    import sqlalchemy
+    from sqlalchemy import event
+    from sqlalchemy.pool import Pool
+    
+    class SecureDatabaseConfig:
+        """Secure database configuration for production."""
+        
+        @staticmethod
+        def create_secure_engine(connection_string: str):
+            """Create database engine with security configurations."""
+            
+            engine = sqlalchemy.create_engine(
+                connection_string,
+                # Connection pooling
+                pool_size=5,
+                max_overflow=10,
+                pool_timeout=30,
+                pool_recycle=3600,
+                pool_pre_ping=True,
+                
+                # Security settings
+                connect_args={
+                    "sslmode": "require",
+                    "sslcert": "/path/to/client-cert.pem",
+                    "sslkey": "/path/to/client-key.pem",
+                    "sslrootcert": "/path/to/ca-cert.pem",
+                    "application_name": "tableai",
+                    "connect_timeout": 10,
+                }
+            )
+            
+            # Add connection event listeners
+            @event.listens_for(Pool, "connect")
+            def set_sqlite_pragma(dbapi_connection, connection_record):
+                if 'sqlite' in connection_string:
+                    cursor = dbapi_connection.cursor()
+                    cursor.execute("PRAGMA foreign_keys=ON")
+                    cursor.execute("PRAGMA journal_mode=WAL")
+                    cursor.close()
+            
+            return engine
+        
+        @staticmethod
+        def validate_query_security(query: str) -> bool:
+            """Validate query for security concerns."""
+            
+            dangerous_patterns = [
+                r'DROP\s+TABLE',
+                r'DELETE\s+FROM',
+                r'UPDATE\s+.*SET',
+                r'INSERT\s+INTO',
+                r'ALTER\s+TABLE',
+                r'CREATE\s+TABLE',
+                r'TRUNCATE',
+                r'--.*',  # SQL comments
+                r'/\*.*\*/',  # Block comments
+            ]
+            
+            import re
+            query_upper = query.upper()
+            
+            for pattern in dangerous_patterns:
+                if re.search(pattern, query_upper):
+                    return False
+            
+            return True
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Monitoring and Logging
+
+<AccordionGroup>
+  <Accordion title="Application Monitoring">
+    ```python
+    # monitoring.py
+    import time
+    import psutil
+    import logging
+    from prometheus_client import Counter, Histogram, Gauge, start_http_server
+    
+    # Prometheus metrics
+    REQUEST_COUNT = Counter('tableai_requests_total', 'Total requests', ['method', 'endpoint'])
+    REQUEST_DURATION = Histogram('tableai_request_duration_seconds', 'Request duration')
+    ACTIVE_USERS = Gauge('tableai_active_users', 'Number of active users')
+    MEMORY_USAGE = Gauge('tableai_memory_usage_bytes', 'Memory usage in bytes')
+    
+    class ApplicationMonitor:
+        """Application monitoring and metrics collection."""
+        
+        def __init__(self):
+            self.logger = logging.getLogger(__name__)
+            
+        def record_request(self, method: str, endpoint: str, duration: float):
+            """Record request metrics."""
+            REQUEST_COUNT.labels(method=method, endpoint=endpoint).inc()
+            REQUEST_DURATION.observe(duration)
+            
+        def update_system_metrics(self):
+            """Update system resource metrics."""
+            process = psutil.Process()
+            MEMORY_USAGE.set(process.memory_info().rss)
+            
+        def log_performance_metrics(self):
+            """Log performance metrics."""
+            process = psutil.Process()
+            cpu_percent = process.cpu_percent()
+            memory_mb = process.memory_info().rss / 1024 / 1024
+            
+            self.logger.info(f"Performance metrics - CPU: {cpu_percent:.1f}%, Memory: {memory_mb:.1f}MB")
+    
+    # Start Prometheus metrics server
+    if os.getenv('ENABLE_METRICS', 'false').lower() == 'true':
+        start_http_server(8000)
+        monitor = ApplicationMonitor()
+    ```
+  </Accordion>
+  
+  <Accordion title="Structured Logging">
+    ```python
+    # logging_config.py
+    import logging
+    import json
+    import sys
+    from datetime import datetime
+    
+    class JSONFormatter(logging.Formatter):
+        """JSON formatter for structured logging."""
+        
+        def format(self, record):
+            log_entry = {
+                'timestamp': datetime.utcnow().isoformat(),
+                'level': record.levelname,
+                'logger': record.name,
+                'message': record.getMessage(),
+                'module': record.module,
+                'function': record.funcName,
+                'line': record.lineno,
+            }
+            
+            # Add exception info if present
+            if record.exc_info:
+                log_entry['exception'] = self.formatException(record.exc_info)
+            
+            # Add extra fields
+            for key, value in record.__dict__.items():
+                if key not in ['name', 'msg', 'args', 'levelname', 'levelno', 
+                              'pathname', 'filename', 'module', 'lineno', 
+                              'funcName', 'created', 'msecs', 'relativeCreated', 
+                              'thread', 'threadName', 'processName', 'process', 
+                              'getMessage', 'exc_info', 'exc_text', 'stack_info']:
+                    log_entry[key] = value
+            
+            return json.dumps(log_entry)
+    
+    def setup_production_logging():
+        """Setup production logging configuration."""
+        
+        # Root logger
+        root_logger = logging.getLogger()
+        root_logger.setLevel(logging.INFO)
+        
+        # Console handler with JSON formatting
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler.setFormatter(JSONFormatter())
+        root_logger.addHandler(console_handler)
+        
+        # File handler for errors
+        error_handler = logging.FileHandler('error.log')
+        error_handler.setLevel(logging.ERROR)
+        error_handler.setFormatter(JSONFormatter())
+        root_logger.addHandler(error_handler)
+        
+        # Configure third-party loggers
+        logging.getLogger('urllib3').setLevel(logging.WARNING)
+        logging.getLogger('requests').setLevel(logging.WARNING)
+        logging.getLogger('streamlit').setLevel(logging.ERROR)
+    ```
+  </Accordion>
+  
+  <Accordion title="Health Checks">
+    ```python
+    # health_check.py
+    import asyncio
+    import httpx
+    from typing import Dict, Any
+    
+    class HealthChecker:
+        """Application health check system."""
+        
+        def __init__(self):
+            self.checks = {
+                'database': self.check_database,
+                'ollama': self.check_ollama,
+                'disk_space': self.check_disk_space,
+                'memory': self.check_memory,
+            }
+        
+        async def check_database(self) -> Dict[str, Any]:
+            """Check database connectivity."""
+            try:
+                engine = get_database_engine()
+                with engine.connect() as conn:
+                    result = conn.execute(text("SELECT 1"))
+                    return {'status': 'healthy', 'latency_ms': 0}
+            except Exception as e:
+                return {'status': 'unhealthy', 'error': str(e)}
+        
+        async def check_ollama(self) -> Dict[str, Any]:
+            """Check Ollama service."""
+            try:
+                async with httpx.AsyncClient() as client:
+                    start_time = time.time()
+                    response = await client.get(
+                        f"{os.getenv('OLLAMA_HOST', 'http://localhost:11434')}/api/version",
+                        timeout=10
+                    )
+                    latency = (time.time() - start_time) * 1000
+                    
+                    if response.status_code == 200:
+                        return {'status': 'healthy', 'latency_ms': latency}
+                    else:
+                        return {'status': 'unhealthy', 'error': f'HTTP {response.status_code}'}
+            except Exception as e:
+                return {'status': 'unhealthy', 'error': str(e)}
+        
+        def check_disk_space(self) -> Dict[str, Any]:
+            """Check available disk space."""
+            import shutil
+            
+            total, used, free = shutil.disk_usage('/')
+            free_percent = (free / total) * 100
+            
+            if free_percent > 10:
+                return {'status': 'healthy', 'free_percent': free_percent}
+            else:
+                return {'status': 'unhealthy', 'free_percent': free_percent}
+        
+        def check_memory(self) -> Dict[str, Any]:
+            """Check memory usage."""
+            import psutil
+            
+            memory = psutil.virtual_memory()
+            if memory.percent < 90:
+                return {'status': 'healthy', 'usage_percent': memory.percent}
+            else:
+                return {'status': 'unhealthy', 'usage_percent': memory.percent}
+        
+        async def run_all_checks(self) -> Dict[str, Any]:
+            """Run all health checks."""
+            results = {}
+            overall_status = 'healthy'
+            
+            for name, check_func in self.checks.items():
+                if asyncio.iscoroutinefunction(check_func):
+                    result = await check_func()
+                else:
+                    result = check_func()
+                
+                results[name] = result
+                if result['status'] != 'healthy':
+                    overall_status = 'unhealthy'
+            
+            return {
+                'status': overall_status,
+                'timestamp': datetime.utcnow().isoformat(),
+                'checks': results
+            }
+    
+    # Health check endpoint
+    health_checker = HealthChecker()
+    
+    @st.cache_data(ttl=30)  # Cache for 30 seconds
+    def get_health_status():
+        return asyncio.run(health_checker.run_all_checks())
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Scaling and Performance
+
+### Horizontal Scaling
+
+<AccordionGroup>
+  <Accordion title="Load Balancer Configuration">
+    ```yaml
+    # kubernetes-deployment.yaml
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: tableai-deployment
+    spec:
+      replicas: 3
+      selector:
+        matchLabels:
+          app: tableai
+      template:
+        metadata:
+          labels:
+            app: tableai
+        spec:
+          containers:
+          - name: tableai
+            image: your-registry/tableai:latest
+            ports:
+            - containerPort: 8501
+            env:
+            - name: OLLAMA_HOST
+              value: "http://ollama-service:11434"
+            resources:
+              requests:
+                memory: "1Gi"
+                cpu: "500m"
+              limits:
+                memory: "2Gi"
+                cpu: "1000m"
+            readinessProbe:
+              httpGet:
+                path: /_stcore/health
+                port: 8501
+              initialDelaySeconds: 30
+              periodSeconds: 10
+            livenessProbe:
+              httpGet:
+                path: /_stcore/health
+                port: 8501
+              initialDelaySeconds: 60
+              periodSeconds: 30
+    
+    ---
+    apiVersion: v1
+    kind: Service
+    metadata:
+      name: tableai-service
+    spec:
+      selector:
+        app: tableai
+      ports:
+      - protocol: TCP
+        port: 80
+        targetPort: 8501
+      type: LoadBalancer
+    ```
+  </Accordion>
+  
+  <Accordion title="Auto-scaling Configuration">
+    ```yaml
+    # horizontal-pod-autoscaler.yaml
+    apiVersion: autoscaling/v2
+    kind: HorizontalPodAutoscaler
+    metadata:
+      name: tableai-hpa
+    spec:
+      scaleTargetRef:
+        apiVersion: apps/v1
+        kind: Deployment
+        name: tableai-deployment
+      minReplicas: 2
+      maxReplicas: 10
+      metrics:
+      - type: Resource
+        resource:
+          name: cpu
+          target:
+            type: Utilization
+            averageUtilization: 70
+      - type: Resource
+        resource:
+          name: memory
+          target:
+            type: Utilization
+            averageUtilization: 80
+      behavior:
+        scaleDown:
+          stabilizationWindowSeconds: 300
+          policies:
+          - type: Percent
+            value: 10
+            periodSeconds: 60
+        scaleUp:
+          stabilizationWindowSeconds: 60
+          policies:
+          - type: Percent
+            value: 100
+            periodSeconds: 15
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Performance Optimization
+
+```python
+# performance_optimization.py
+import asyncio
+import concurrent.futures
+from functools import lru_cache
+
+class PerformanceOptimizer:
+    """Performance optimization utilities."""
+    
+    def __init__(self):
+        self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=4)
+    
+    @lru_cache(maxsize=128)
+    def cached_data_analysis(self, data_hash: str, analysis_type: str):
+        """Cache expensive data analysis operations."""
+        # Actual analysis implementation
+        pass
+    
+    async def parallel_ai_requests(self, questions: list) -> list:
+        """Process multiple AI requests in parallel."""
+        
+        async def process_question(question: str):
+            # AI processing logic
+            return await ai_process_question(question)
+        
+        tasks = [process_question(q) for q in questions]
+        return await asyncio.gather(*tasks)
+    
+    def optimize_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Optimize DataFrame for memory and performance."""
+        
+        # Downcast numeric types
+        for col in df.select_dtypes(include=['int64']):
+            df[col] = pd.to_numeric(df[col], downcast='integer')
+        
+        for col in df.select_dtypes(include=['float64']):
+            df[col] = pd.to_numeric(df[col], downcast='float')
+        
+        # Convert to category for low cardinality strings
+        for col in df.select_dtypes(include=['object']):
+            if df[col].nunique() / len(df) < 0.5:
+                df[col] = df[col].astype('category')
+        
+        return df
+```
+
+## Maintenance and Updates
+
+### Backup Strategies
+
+```bash
+#!/bin/bash
+# backup.sh - Comprehensive backup script
+
+# Database backup
+if [ "$DATABASE_TYPE" = "postgresql" ]; then
+    pg_dump -h $DATABASE_HOST -U $DATABASE_USER $DATABASE_NAME > "backup_$(date +%Y%m%d_%H%M%S).sql"
+elif [ "$DATABASE_TYPE" = "mysql" ]; then
+    mysqldump -h $DATABASE_HOST -u $DATABASE_USER -p $DATABASE_NAME > "backup_$(date +%Y%m%d_%H%M%S).sql"
+fi
+
+# Application data backup
+tar -czf "app_data_$(date +%Y%m%d_%H%M%S).tar.gz" data/ logs/ uploads/
+
+# Configuration backup
+tar -czf "config_$(date +%Y%m%d_%H%M%S).tar.gz" .env nginx.conf docker-compose.yml
+
+# Ollama models backup
+tar -czf "ollama_models_$(date +%Y%m%d_%H%M%S).tar.gz" ~/.ollama/
+
+# Upload to S3 (optional)
+if [ ! -z "$AWS_S3_BUCKET" ]; then
+    aws s3 cp backup_*.sql s3://$AWS_S3_BUCKET/backups/
+    aws s3 cp app_data_*.tar.gz s3://$AWS_S3_BUCKET/backups/
+    aws s3 cp config_*.tar.gz s3://$AWS_S3_BUCKET/backups/
+fi
+
+# Clean old backups (keep last 7 days)
+find . -name "backup_*.sql" -mtime +7 -delete
+find . -name "app_data_*.tar.gz" -mtime +7 -delete
+find . -name "config_*.tar.gz" -mtime +7 -delete
+```
+
+### Update Process
+
+<Steps>
+  <Step title="Backup Current Version">
+    Create full backup of data and configuration
+  </Step>
+  <Step title="Test in Staging">
+    Deploy and test new version in staging environment
+  </Step>
+  <Step title="Rolling Update">
+    Update production instances one by one
+  </Step>
+  <Step title="Verify Health">
+    Run health checks and monitor metrics
+  </Step>
+  <Step title="Rollback Plan">
+    Keep previous version ready for quick rollback
+  </Step>
+</Steps>
+
+This comprehensive deployment guide covers all aspects of deploying TableAI from development to production environments. Choose the deployment strategy that best fits your infrastructure and requirements.

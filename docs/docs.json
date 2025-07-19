@@ -1,0 +1,13 @@
+{
+  "name": "TableAI Documentation",
+  "theme": "maple",
+  "colors": {
+    "primary": "#1976d2"
+  },
+  "navigation": {
+    "pages": [
+      "introduction",
+      "quickstart"
+    ]
+  }
+}

@@ -1,0 +1,744 @@
+---
+title: 'Database Connectivity'
+description: 'Connect and analyze data from various database sources'
+---
+
+## Overview
+
+TableAI provides robust database connectivity, allowing you to connect to various database systems and perform AI-powered analysis directly on your database tables. The system supports both SQL and NoSQL databases with intelligent query generation.
+
+## Supported Databases
+
+<CardGroup cols={2}>
+  <Card
+    title="PostgreSQL"
+    icon="database"
+  >
+    Full support for PostgreSQL databases with advanced features
+  </Card>
+  <Card
+    title="MySQL"
+    icon="database"
+  >
+    Complete MySQL database integration with optimized queries
+  </Card>
+  <Card
+    title="SQLite"
+    icon="database"
+  >
+    Local SQLite database files for development and testing
+  </Card>
+  <Card
+    title="SQL Server"
+    icon="database"
+  >
+    Microsoft SQL Server connectivity with enterprise features
+  </Card>
+</CardGroup>
+
+## Database Configuration
+
+### Connection Parameters
+
+Configure your database connection using environment variables:
+
+```bash
+# PostgreSQL Configuration
+DATABASE_TYPE=postgresql
+DATABASE_HOST=localhost
+DATABASE_PORT=5432
+DATABASE_NAME=your_database
+DATABASE_USER=your_username
+DATABASE_PASSWORD=your_password
+
+# MySQL Configuration  
+DATABASE_TYPE=mysql
+DATABASE_HOST=localhost
+DATABASE_PORT=3306
+DATABASE_NAME=your_database
+DATABASE_USER=your_username
+DATABASE_PASSWORD=your_password
+
+# SQLite Configuration
+DATABASE_TYPE=sqlite
+DATABASE_PATH=/path/to/database.db
+
+# SQL Server Configuration
+DATABASE_TYPE=sqlserver
+DATABASE_HOST=localhost
+DATABASE_PORT=1433
+DATABASE_NAME=your_database
+DATABASE_USER=your_username
+DATABASE_PASSWORD=your_password
+```
+
+### Connection String Builder
+
+The system automatically builds appropriate connection strings:
+
+```python
+def build_connection_string() -> str:
+    """Build database connection string based on environment variables."""
+    
+    db_type = os.getenv('DATABASE_TYPE', 'sqlite')
+    
+    if db_type == 'postgresql':
+        return (
+            f"postgresql://{os.getenv('DATABASE_USER')}:"
+            f"{os.getenv('DATABASE_PASSWORD')}@"
+            f"{os.getenv('DATABASE_HOST')}:"
+            f"{os.getenv('DATABASE_PORT')}/"
+            f"{os.getenv('DATABASE_NAME')}"
+        )
+    
+    elif db_type == 'mysql':
+        return (
+            f"mysql+pymysql://{os.getenv('DATABASE_USER')}:"
+            f"{os.getenv('DATABASE_PASSWORD')}@"
+            f"{os.getenv('DATABASE_HOST')}:"
+            f"{os.getenv('DATABASE_PORT')}/"
+            f"{os.getenv('DATABASE_NAME')}"
+        )
+    
+    elif db_type == 'sqlite':
+        db_path = os.getenv('DATABASE_PATH', 'data.db')
+        return f"sqlite:///{db_path}"
+    
+    elif db_type == 'sqlserver':
+        return (
+            f"mssql+pyodbc://{os.getenv('DATABASE_USER')}:"
+            f"{os.getenv('DATABASE_PASSWORD')}@"
+            f"{os.getenv('DATABASE_HOST')}:"
+            f"{os.getenv('DATABASE_PORT')}/"
+            f"{os.getenv('DATABASE_NAME')}"
+            f"?driver=ODBC+Driver+17+for+SQL+Server"
+        )
+    
+    else:
+        raise ValueError(f"Unsupported database type: {db_type}")
+```
+
+## Database Integration in UI
+
+### Connection Interface
+
+The database connection interface provides a seamless user experience:
+
+<AccordionGroup>
+  <Accordion title="Connection Form">
+    ```python
+    # Database connection form in Streamlit
+    with st.expander("🗄️ Connect to Database"):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            db_type = st.selectbox(
+                "Database Type",
+                ["postgresql", "mysql", "sqlite", "sqlserver"],
+                help="Select your database system"
+            )
+            
+            host = st.text_input(
+                "Host", 
+                value="localhost",
+                help="Database server hostname or IP"
+            )
+            
+            port = st.number_input(
+                "Port", 
+                value=5432 if db_type == "postgresql" else 3306,
+                help="Database server port number"
+            )
+        
+        with col2:
+            database = st.text_input(
+                "Database Name",
+                help="Name of the database to connect to"
+            )
+            
+            username = st.text_input(
+                "Username",
+                help="Database user credentials"
+            )
+            
+            password = st.text_input(
+                "Password", 
+                type="password",
+                help="Database password (stored securely)"
+            )
+        
+        # Connection test button
+        if st.button("Test Connection", type="primary"):
+            test_database_connection(db_type, host, port, database, username, password)
+    ```
+  </Accordion>
+  
+  <Accordion title="Table Selection">
+    ```python
+    # Table browser and selection
+    if st.session_state.get('db_connected'):
+        st.subheader("📋 Available Tables")
+        
+        # Get list of tables
+        tables = get_database_tables()
+        
+        if tables:
+            selected_table = st.selectbox(
+                "Select Table",
+                tables,
+                help="Choose a table to analyze"
+            )
+            
+            if selected_table:
+                # Show table preview
+                preview_df = get_table_preview(selected_table, limit=5)
+                st.write("Table Preview:")
+                st.dataframe(preview_df)
+                
+                # Table statistics
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Rows", get_table_row_count(selected_table))
+                with col2:
+                    st.metric("Columns", len(preview_df.columns))
+                with col3:
+                    st.metric("Size", get_table_size(selected_table))
+        else:
+            st.warning("No tables found in the database.")
+    ```
+  </Accordion>
+  
+  <Accordion title="Query Builder">
+    ```python
+    # Interactive query builder
+    st.subheader("🔍 Query Builder")
+    
+    query_mode = st.radio(
+        "Query Mode",
+        ["AI Assistant", "Custom SQL", "Visual Builder"],
+        help="Choose how to build your query"
+    )
+    
+    if query_mode == "AI Assistant":
+        question = st.text_area(
+            "Ask a question about your data:",
+            placeholder="e.g., Show me the top 10 customers by sales"
+        )
+        
+        if st.button("Generate Query"):
+            sql_query = generate_sql_from_question(question, selected_table)
+            st.code(sql_query, language="sql")
+    
+    elif query_mode == "Custom SQL":
+        custom_query = st.text_area(
+            "Enter SQL Query:",
+            height=150,
+            placeholder="SELECT * FROM table_name WHERE condition"
+        )
+        
+        if st.button("Execute Query"):
+            execute_custom_query(custom_query)
+    
+    elif query_mode == "Visual Builder":
+        build_visual_query_interface(selected_table)
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Query Generation & Execution
+
+### Intelligent SQL Generation
+
+The AI system generates optimized SQL queries based on natural language:
+
+```python
+def generate_sql_from_question(question: str, table_name: str) -> str:
+    """Generate SQL query from natural language question."""
+    
+    # Get table schema
+    schema = get_table_schema(table_name)
+    
+    # Build context for AI
+    context = f"""
+    Table: {table_name}
+    Schema: {schema}
+    
+    Generate a SQL query to answer: {question}
+    
+    Rules:
+    - Use proper SQL syntax
+    - Include appropriate WHERE clauses
+    - Use aggregations when needed
+    - Limit results for performance
+    - Return only the SQL query
+    """
+    
+    # Get AI response
+    llm = get_llm()
+    response = llm.complete(context)
+    
+    # Extract and clean SQL
+    sql_query = extract_sql_from_response(str(response))
+    return optimize_sql_query(sql_query, table_name)
+```
+
+### Query Optimization
+
+<CodeGroup>
+
+```python Performance Optimization
+def optimize_sql_query(query: str, table_name: str) -> str:
+    """Optimize SQL query for better performance."""
+    
+    # Add LIMIT if not present
+    if "LIMIT" not in query.upper():
+        query += " LIMIT 1000"
+    
+    # Add indexes hints for large tables
+    if is_large_table(table_name):
+        query = add_index_hints(query, table_name)
+    
+    # Optimize JOIN operations
+    query = optimize_joins(query)
+    
+    return query
+
+def add_index_hints(query: str, table_name: str) -> str:
+    """Add index hints for better performance."""
+    indexes = get_table_indexes(table_name)
+    
+    for index in indexes:
+        if index['column'] in query:
+            # Add USE INDEX hint
+            query = query.replace(
+                f"FROM {table_name}",
+                f"FROM {table_name} USE INDEX ({index['name']})"
+            )
+    
+    return query
+```
+
+```python Security Validation
+def validate_sql_query(query: str) -> tuple[bool, str]:
+    """Validate SQL query for security and safety."""
+    
+    # Convert to uppercase for checking
+    query_upper = query.upper()
+    
+    # Check for dangerous operations
+    dangerous_ops = [
+        'DROP', 'DELETE', 'INSERT', 'UPDATE', 
+        'ALTER', 'CREATE', 'TRUNCATE', 'GRANT', 
+        'REVOKE', 'EXEC', 'EXECUTE'
+    ]
+    
+    for op in dangerous_ops:
+        if op in query_upper:
+            return False, f"Operation '{op}' is not allowed"
+    
+    # Check for system tables/functions
+    system_patterns = [
+        'INFORMATION_SCHEMA', 'SYS.', 'PG_', 
+        'MYSQL.', 'MASTER.', 'MSDB.'
+    ]
+    
+    for pattern in system_patterns:
+        if pattern in query_upper:
+            return False, f"Access to system objects is not allowed"
+    
+    # Validate query structure
+    if not query_upper.strip().startswith('SELECT'):
+        return False, "Only SELECT queries are allowed"
+    
+    return True, "Query is valid"
+```
+
+```python Error Handling
+def execute_database_query(query: str) -> pd.DataFrame:
+    """Execute database query with comprehensive error handling."""
+    
+    try:
+        # Validate query first
+        is_valid, error_msg = validate_sql_query(query)
+        if not is_valid:
+            raise ValueError(f"Invalid query: {error_msg}")
+        
+        # Execute with timeout
+        engine = get_database_engine()
+        with engine.connect() as conn:
+            # Set query timeout
+            conn.execute(text("SET statement_timeout = '30s'"))
+            
+            # Execute main query
+            result_df = pd.read_sql_query(query, conn)
+            
+            return result_df
+    
+    except sqlalchemy.exc.OperationalError as e:
+        if "timeout" in str(e).lower():
+            raise TimeoutError("Query execution timed out")
+        else:
+            raise DatabaseError(f"Database connection error: {e}")
+    
+    except sqlalchemy.exc.ProgrammingError as e:
+        raise QueryError(f"SQL syntax error: {e}")
+    
+    except Exception as e:
+        raise DatabaseError(f"Unexpected database error: {e}")
+```
+
+</CodeGroup>
+
+## Database Schema Discovery
+
+### Automatic Schema Detection
+
+TableAI automatically discovers and analyzes database schemas:
+
+```python
+def discover_database_schema() -> dict:
+    """Discover and analyze database schema."""
+    
+    schema_info = {
+        'tables': [],
+        'relationships': [],
+        'indexes': [],
+        'constraints': []
+    }
+    
+    engine = get_database_engine()
+    inspector = inspect(engine)
+    
+    # Get all tables
+    for table_name in inspector.get_table_names():
+        table_info = {
+            'name': table_name,
+            'columns': [],
+            'primary_keys': inspector.get_pk_constraint(table_name)['constrained_columns'],
+            'foreign_keys': inspector.get_foreign_keys(table_name),
+            'indexes': inspector.get_indexes(table_name)
+        }
+        
+        # Get column information
+        for column in inspector.get_columns(table_name):
+            column_info = {
+                'name': column['name'],
+                'type': str(column['type']),
+                'nullable': column['nullable'],
+                'default': column['default'],
+                'autoincrement': column.get('autoincrement', False)
+            }
+            table_info['columns'].append(column_info)
+        
+        schema_info['tables'].append(table_info)
+    
+    return schema_info
+```
+
+### Schema Visualization
+
+<AccordionGroup>
+  <Accordion title="Table Relationships">
+    ```python
+    def visualize_schema_relationships(schema_info: dict):
+        """Create visual representation of database relationships."""
+        
+        # Create network graph
+        import networkx as nx
+        import matplotlib.pyplot as plt
+        
+        G = nx.DiGraph()
+        
+        # Add tables as nodes
+        for table in schema_info['tables']:
+            G.add_node(table['name'], type='table')
+        
+        # Add relationships as edges
+        for table in schema_info['tables']:
+            for fk in table['foreign_keys']:
+                G.add_edge(
+                    table['name'], 
+                    fk['referred_table'],
+                    relationship='foreign_key'
+                )
+        
+        # Create layout
+        pos = nx.spring_layout(G, k=2, iterations=50)
+        
+        # Draw graph
+        plt.figure(figsize=(12, 8))
+        nx.draw(G, pos, with_labels=True, node_color='lightblue',
+                node_size=3000, font_size=10, font_weight='bold',
+                arrows=True, edge_color='gray')
+        
+        plt.title("Database Schema Relationships")
+        st.pyplot(plt)
+    ```
+  </Accordion>
+  
+  <Accordion title="Column Statistics">
+    ```python
+    def analyze_column_statistics(table_name: str) -> pd.DataFrame:
+        """Analyze statistical properties of table columns."""
+        
+        engine = get_database_engine()
+        
+        # Get column information
+        inspector = inspect(engine)
+        columns = inspector.get_columns(table_name)
+        
+        stats_data = []
+        
+        for column in columns:
+            col_name = column['name']
+            col_type = str(column['type'])
+            
+            # Get basic statistics
+            with engine.connect() as conn:
+                # Count total and non-null values
+                total_query = f"SELECT COUNT(*) as total, COUNT({col_name}) as non_null FROM {table_name}"
+                result = conn.execute(text(total_query)).fetchone()
+                total_count = result[0]
+                non_null_count = result[1]
+                
+                # Get unique values count
+                unique_query = f"SELECT COUNT(DISTINCT {col_name}) as unique_count FROM {table_name}"
+                unique_count = conn.execute(text(unique_query)).scalar()
+                
+                # For numeric columns, get min/max/avg
+                if 'INT' in col_type.upper() or 'FLOAT' in col_type.upper() or 'DECIMAL' in col_type.upper():
+                    stats_query = f"SELECT MIN({col_name}) as min_val, MAX({col_name}) as max_val, AVG({col_name}) as avg_val FROM {table_name}"
+                    stats_result = conn.execute(text(stats_query)).fetchone()
+                    min_val, max_val, avg_val = stats_result
+                else:
+                    min_val = max_val = avg_val = None
+            
+            stats_data.append({
+                'Column': col_name,
+                'Type': col_type,
+                'Total_Records': total_count,
+                'Non_Null': non_null_count,
+                'Null_Count': total_count - non_null_count,
+                'Null_Percentage': round((total_count - non_null_count) / total_count * 100, 2),
+                'Unique_Values': unique_count,
+                'Min_Value': min_val,
+                'Max_Value': max_val,
+                'Average': round(avg_val, 2) if avg_val else None
+            })
+        
+        return pd.DataFrame(stats_data)
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Advanced Features
+
+### Query History & Caching
+
+```python
+class QueryCache:
+    """Cache for database query results."""
+    
+    def __init__(self, max_size: int = 100):
+        self.cache = {}
+        self.access_times = {}
+        self.max_size = max_size
+    
+    def get(self, query_hash: str) -> pd.DataFrame:
+        """Get cached query result."""
+        if query_hash in self.cache:
+            self.access_times[query_hash] = time.time()
+            return self.cache[query_hash].copy()
+        return None
+    
+    def put(self, query_hash: str, result: pd.DataFrame):
+        """Cache query result."""
+        if len(self.cache) >= self.max_size:
+            # Remove least recently used
+            oldest_key = min(self.access_times.keys(), 
+                           key=lambda k: self.access_times[k])
+            del self.cache[oldest_key]
+            del self.access_times[oldest_key]
+        
+        self.cache[query_hash] = result.copy()
+        self.access_times[query_hash] = time.time()
+    
+    def hash_query(self, query: str) -> str:
+        """Generate hash for query caching."""
+        return hashlib.md5(query.encode()).hexdigest()
+
+# Global cache instance
+query_cache = QueryCache()
+```
+
+### Connection Pooling
+
+```python
+def create_database_engine() -> sqlalchemy.Engine:
+    """Create database engine with connection pooling."""
+    
+    connection_string = build_connection_string()
+    
+    # Configure connection pool
+    engine = create_engine(
+        connection_string,
+        pool_size=5,           # Number of connections to maintain
+        max_overflow=10,       # Additional connections when needed
+        pool_timeout=30,       # Timeout for getting connection
+        pool_recycle=3600,     # Recycle connections after 1 hour
+        pool_pre_ping=True,    # Validate connections before use
+        echo=False             # Set to True for SQL debugging
+    )
+    
+    return engine
+
+@st.cache_resource
+def get_database_engine():
+    """Get cached database engine."""
+    return create_database_engine()
+```
+
+### Batch Operations
+
+```python
+def execute_batch_queries(queries: list) -> list:
+    """Execute multiple queries efficiently."""
+    
+    results = []
+    engine = get_database_engine()
+    
+    with engine.connect() as conn:
+        # Use transaction for consistency
+        trans = conn.begin()
+        
+        try:
+            for query in queries:
+                result = conn.execute(text(query))
+                if result.returns_rows:
+                    df = pd.DataFrame(result.fetchall(), columns=result.keys())
+                    results.append(df)
+                else:
+                    results.append(None)
+            
+            trans.commit()
+            
+        except Exception as e:
+            trans.rollback()
+            raise DatabaseError(f"Batch operation failed: {e}")
+    
+    return results
+```
+
+## Troubleshooting
+
+### Common Connection Issues
+
+<AccordionGroup>
+  <Accordion title="Connection Timeouts">
+    **Problem:** Database connection times out
+    
+    **Solutions:**
+    - Check network connectivity
+    - Verify database server is running
+    - Increase connection timeout settings
+    - Check firewall/security group settings
+    
+    ```python
+    # Increase timeout settings
+    engine = create_engine(
+        connection_string,
+        connect_args={
+            "connect_timeout": 60,
+            "read_timeout": 60,
+            "write_timeout": 60
+        }
+    )
+    ```
+  </Accordion>
+  
+  <Accordion title="Authentication Errors">
+    **Problem:** Invalid credentials or permission denied
+    
+    **Solutions:**
+    - Verify username and password
+    - Check user permissions on database
+    - Ensure user has SELECT privileges
+    - Test connection with database client
+    
+    ```python
+    # Test connection
+    def test_database_connection():
+        try:
+            engine = get_database_engine()
+            with engine.connect() as conn:
+                result = conn.execute(text("SELECT 1"))
+                return True, "Connection successful"
+        except Exception as e:
+            return False, f"Connection failed: {e}"
+    ```
+  </Accordion>
+  
+  <Accordion title="Query Performance">
+    **Problem:** Slow query execution
+    
+    **Solutions:**
+    - Add appropriate indexes
+    - Limit result set size
+    - Optimize WHERE clauses
+    - Use query caching
+    
+    ```python
+    # Query optimization
+    def optimize_slow_query(query: str) -> str:
+        # Add LIMIT if missing
+        if "LIMIT" not in query.upper():
+            query += " LIMIT 1000"
+        
+        # Add WHERE clause for time-based data
+        if "date" in query.lower() and "WHERE" not in query.upper():
+            query = query.replace(
+                "FROM", 
+                "FROM table_name WHERE date >= CURRENT_DATE - INTERVAL '30 days' AND FROM"
+            )
+        
+        return query
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Security Best Practices
+
+<Warning>
+**Never store database credentials in code or version control**
+</Warning>
+
+<Warning>
+**Always validate and sanitize SQL queries**
+</Warning>
+
+<Warning>
+**Use read-only database users when possible**
+</Warning>
+
+<Warning>
+**Implement proper connection encryption (SSL/TLS)**
+</Warning>
+
+### Secure Configuration
+
+```python
+# Environment-based configuration
+def get_secure_database_config():
+    """Get database configuration with security best practices."""
+    
+    return {
+        'connection_string': os.getenv('DATABASE_URL'),
+        'ssl_mode': os.getenv('DATABASE_SSL_MODE', 'require'),
+        'ssl_cert': os.getenv('DATABASE_SSL_CERT'),
+        'ssl_key': os.getenv('DATABASE_SSL_KEY'),
+        'ssl_ca': os.getenv('DATABASE_SSL_CA'),
+        'read_only': os.getenv('DATABASE_READ_ONLY', 'true').lower() == 'true'
+    }
+```
+
+The database connectivity features in TableAI provide a robust foundation for analyzing data directly from your existing database systems, combining the power of SQL with AI-driven insights generation.

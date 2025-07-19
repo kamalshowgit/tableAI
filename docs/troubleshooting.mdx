@@ -1,0 +1,1071 @@
+---
+title: 'Troubleshooting Guide'
+description: 'Common issues and solutions for TableAI'
+---
+
+## Quick Diagnostics
+
+Before diving into specific issues, run these quick diagnostic checks:
+
+<Steps>
+  <Step title="System Requirements">
+    Verify your system meets minimum requirements
+  </Step>
+  <Step title="Dependencies">
+    Check all required packages are installed
+  </Step>
+  <Step title="Environment Variables">
+    Validate configuration settings
+  </Step>
+  <Step title="Logs">
+    Check application logs for error messages
+  </Step>
+</Steps>
+
+## Installation Issues
+
+### Python Environment Problems
+
+<AccordionGroup>
+  <Accordion title="Python Version Compatibility">
+    **Problem:** TableAI doesn't start due to Python version issues
+    
+    **Symptoms:**
+    - Import errors on startup
+    - Syntax errors in dependencies
+    - Package installation failures
+    
+    **Solutions:**
+    ```bash
+    # Check Python version
+    python --version
+    # Should be 3.8 or higher
+    
+    # If using wrong version, install correct Python
+    # On macOS with Homebrew
+    brew install python@3.11
+    
+    # Create new virtual environment with correct Python
+    python3.11 -m venv tableai_env
+    source tableai_env/bin/activate
+    
+    # Reinstall requirements
+    pip install -r requirements.txt
+    ```
+    
+    **Prevention:**
+    - Always use virtual environments
+    - Specify Python version in runtime.txt
+    - Test on target Python version before deployment
+  </Accordion>
+  
+  <Accordion title="Package Installation Errors">
+    **Problem:** Requirements installation fails
+    
+    **Common Errors:**
+    ```bash
+    ERROR: Failed building wheel for some-package
+    ERROR: Could not install packages due to an EnvironmentError
+    ```
+    
+    **Solutions:**
+    ```bash
+    # Update pip first
+    pip install --upgrade pip setuptools wheel
+    
+    # Install system dependencies (macOS)
+    brew install postgresql  # For psycopg2
+    brew install mysql       # For MySQL connections
+    
+    # Install system dependencies (Ubuntu/Debian)
+    sudo apt-get update
+    sudo apt-get install python3-dev libpq-dev build-essential
+    
+    # Force reinstall problematic packages
+    pip install --no-cache-dir --force-reinstall pandas
+    
+    # Alternative: Install from conda-forge
+    conda install -c conda-forge pandas numpy matplotlib
+    ```
+    
+    **Common Package Issues:**
+    - **psycopg2**: Requires PostgreSQL development headers
+    - **mysqlclient**: Needs MySQL development libraries
+    - **pandas**: May conflict with numpy versions
+    - **matplotlib**: Requires GUI libraries on some systems
+  </Accordion>
+  
+  <Accordion title="Virtual Environment Issues">
+    **Problem:** Virtual environment not working correctly
+    
+    **Symptoms:**
+    - Packages installed globally instead of in venv
+    - Import errors despite package installation
+    - Permission denied errors
+    
+    **Solutions:**
+    ```bash
+    # Deactivate current environment
+    deactivate
+    
+    # Remove corrupted environment
+    rm -rf your_env_name
+    
+    # Create fresh environment
+    python -m venv tableai_env
+    
+    # Activate properly
+    source tableai_env/bin/activate  # Linux/Mac
+    # or
+    tableai_env\Scripts\activate     # Windows
+    
+    # Verify activation
+    which python
+    which pip
+    
+    # Should point to your virtual environment
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Dependency Conflicts
+
+<AccordionGroup>
+  <Accordion title="Package Version Conflicts">
+    **Problem:** Conflicting package versions
+    
+    **Error Messages:**
+    ```
+    ERROR: pip's dependency resolver does not currently have a solution
+    ERROR: Conflicting package versions detected
+    ```
+    
+    **Diagnosis:**
+    ```bash
+    # Check for conflicts
+    pip check
+    
+    # View dependency tree
+    pip install pipdeptree
+    pipdeptree --warn conflict
+    
+    # List installed packages
+    pip list
+    ```
+    
+    **Solutions:**
+    ```bash
+    # Method 1: Use pip-tools for clean dependencies
+    pip install pip-tools
+    pip-compile requirements.in
+    pip-sync requirements.txt
+    
+    # Method 2: Create fresh environment
+    pip freeze > old_requirements.txt
+    deactivate
+    rm -rf venv
+    python -m venv venv
+    source venv/bin/activate
+    pip install -r requirements.txt
+    
+    # Method 3: Force compatible versions
+    pip install "pandas>=1.3.0,<2.0.0" "numpy>=1.21.0,<1.25.0"
+    ```
+  </Accordion>
+  
+  <Accordion title="Streamlit Compatibility">
+    **Problem:** Streamlit version issues
+    
+    **Common Issues:**
+    - Widget state not persisting
+    - Session state errors
+    - Component rendering problems
+    
+    **Solutions:**
+    ```bash
+    # Check Streamlit version
+    streamlit version
+    
+    # Update to latest stable
+    pip install streamlit>=1.28.0
+    
+    # If using experimental features
+    pip install streamlit>=1.30.0
+    
+    # Clear Streamlit cache
+    streamlit cache clear
+    
+    # Reset Streamlit config
+    rm -rf ~/.streamlit/
+    ```
+    
+    **Version Compatibility Matrix:**
+    - TableAI v1.0+: Streamlit >= 1.28.0
+    - LlamaIndex: Streamlit >= 1.25.0
+    - Plotly: Streamlit >= 1.20.0
+  </Accordion>
+</AccordionGroup>
+
+## AI Model Issues
+
+### Ollama Connection Problems
+
+<AccordionGroup>
+  <Accordion title="Ollama Not Running">
+    **Problem:** Cannot connect to Ollama service
+    
+    **Error Messages:**
+    ```
+    ConnectionError: Could not connect to Ollama
+    ollama.exceptions.ConnectionError
+    ```
+    
+    **Diagnosis:**
+    ```bash
+    # Check if Ollama is running
+    ps aux | grep ollama
+    
+    # Check Ollama status
+    ollama list
+    
+    # Test connection
+    curl http://localhost:11434/api/version
+    ```
+    
+    **Solutions:**
+    ```bash
+    # Start Ollama service
+    ollama serve
+    
+    # Or start in background
+    nohup ollama serve > ollama.log 2>&1 &
+    
+    # Verify service is running
+    ollama list
+    
+    # If port conflict, change port
+    OLLAMA_HOST=127.0.0.1:11435 ollama serve
+    ```
+    
+    **Automatic Service Setup:**
+    ```bash
+    # Create systemd service (Linux)
+    sudo tee /etc/systemd/system/ollama.service > /dev/null <<EOF
+    [Unit]
+    Description=Ollama Service
+    After=network.target
+    
+    [Service]
+    Type=simple
+    User=ollama
+    ExecStart=/usr/local/bin/ollama serve
+    Restart=always
+    RestartSec=3
+    
+    [Install]
+    WantedBy=multi-user.target
+    EOF
+    
+    sudo systemctl enable ollama
+    sudo systemctl start ollama
+    ```
+  </Accordion>
+  
+  <Accordion title="Model Not Found">
+    **Problem:** Specified model not available
+    
+    **Error Messages:**
+    ```
+    Model 'mistral' not found
+    pull model first
+    ```
+    
+    **Solutions:**
+    ```bash
+    # List available models
+    ollama list
+    
+    # Pull required models
+    ollama pull mistral
+    ollama pull llama2
+    ollama pull codellama
+    
+    # Verify model download
+    ollama list
+    
+    # Test model
+    ollama run mistral "Hello, how are you?"
+    ```
+    
+    **Model Recommendations by Use Case:**
+    - **General Analysis**: `mistral` or `llama2`
+    - **Code Generation**: `codellama` or `mistral`
+    - **Fast Responses**: `tinyllama` or `phi`
+    - **Accurate Results**: `llama2:13b` or `mistral:7b`
+  </Accordion>
+  
+  <Accordion title="Model Performance Issues">
+    **Problem:** Slow or poor quality responses
+    
+    **Symptoms:**
+    - Long response times (>60 seconds)
+    - Incorrect code generation
+    - Incomplete responses
+    - Out of memory errors
+    
+    **Diagnosis:**
+    ```bash
+    # Check system resources
+    top
+    htop
+    free -h  # Memory usage
+    df -h    # Disk space
+    
+    # Monitor Ollama logs
+    tail -f ollama.log
+    
+    # Check model size
+    ollama list
+    ```
+    
+    **Solutions:**
+    ```bash
+    # Use smaller model for limited resources
+    ollama pull tinyllama     # ~1GB
+    ollama pull phi           # ~2GB
+    
+    # Adjust model parameters
+    # In your .env file:
+    OLLAMA_MODEL=tinyllama
+    OLLAMA_REQUEST_TIMEOUT=60
+    
+    # Increase system resources
+    # - Add more RAM
+    # - Use SSD storage
+    # - Close other applications
+    
+    # Optimize model loading
+    # Keep Ollama running continuously
+    # Use model caching in application
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### LlamaIndex Integration Issues
+
+<AccordionGroup>
+  <Accordion title="Embedding Model Errors">
+    **Problem:** Embedding generation fails
+    
+    **Error Messages:**
+    ```
+    Failed to generate embeddings
+    EmbeddingModelError: Connection timeout
+    ```
+    
+    **Solutions:**
+    ```bash
+    # Pull embedding model
+    ollama pull nomic-embed-text
+    
+    # Test embedding model
+    ollama run nomic-embed-text "test embedding"
+    
+    # Update environment variable
+    OLLAMA_EMBED_MODEL=nomic-embed-text
+    
+    # Alternative embedding models
+    ollama pull all-minilm  # Lighter model
+    ollama pull mxbai-embed-large  # Better quality
+    ```
+  </Accordion>
+  
+  <Accordion title="Document Indexing Failures">
+    **Problem:** Cannot create document index
+    
+    **Symptoms:**
+    - Index creation hangs
+    - Memory errors during indexing
+    - Corrupted index files
+    
+    **Solutions:**
+    ```python
+    # Reduce document size
+    def split_large_documents(text: str, chunk_size: int = 1000) -> list:
+        chunks = []
+        for i in range(0, len(text), chunk_size):
+            chunks.append(text[i:i + chunk_size])
+        return chunks
+    
+    # Use simpler indexing
+    from llama_index.core import SimpleDirectoryReader, VectorStoreIndex
+    from llama_index.core.node_parser import SimpleNodeParser
+    
+    # Configure node parser
+    parser = SimpleNodeParser.from_defaults(chunk_size=512, chunk_overlap=50)
+    
+    # Create index with smaller chunks
+    documents = SimpleDirectoryReader(input_files=[doc_path]).load_data()
+    nodes = parser.get_nodes_from_documents(documents)
+    index = VectorStoreIndex(nodes, embed_model=embed_model)
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Data Processing Errors
+
+### File Upload Issues
+
+<AccordionGroup>
+  <Accordion title="File Format Problems">
+    **Problem:** Uploaded file cannot be processed
+    
+    **Common Errors:**
+    ```
+    ParserError: Error tokenizing data
+    UnicodeDecodeError: 'utf-8' codec can't decode
+    PermissionError: [Errno 13] Permission denied
+    ```
+    
+    **Solutions:**
+    ```python
+    # Robust file reading with encoding detection
+    import chardet
+    
+    def read_file_safely(file_path: str) -> pd.DataFrame:
+        # Detect encoding
+        with open(file_path, 'rb') as f:
+            raw_data = f.read()
+            encoding = chardet.detect(raw_data)['encoding']
+        
+        # Try different parsing methods
+        try:
+            return pd.read_csv(file_path, encoding=encoding)
+        except:
+            try:
+                return pd.read_csv(file_path, encoding='latin-1')
+            except:
+                return pd.read_csv(file_path, encoding='utf-8', errors='ignore')
+    
+    # Handle different file types
+    def load_data_file(uploaded_file):
+        file_extension = uploaded_file.name.split('.')[-1].lower()
+        
+        if file_extension == 'csv':
+            return pd.read_csv(uploaded_file)
+        elif file_extension in ['xls', 'xlsx']:
+            return pd.read_excel(uploaded_file)
+        elif file_extension == 'json':
+            return pd.read_json(uploaded_file)
+        elif file_extension == 'parquet':
+            return pd.read_parquet(uploaded_file)
+        else:
+            raise ValueError(f"Unsupported file type: {file_extension}")
+    ```
+  </Accordion>
+  
+  <Accordion title="Large File Handling">
+    **Problem:** Application crashes with large files
+    
+    **Symptoms:**
+    - Memory errors
+    - Application timeout
+    - Browser freezing
+    
+    **Solutions:**
+    ```python
+    # Implement chunked reading
+    def read_large_file(file_path: str, chunk_size: int = 10000) -> pd.DataFrame:
+        chunks = []
+        for chunk in pd.read_csv(file_path, chunksize=chunk_size):
+            # Process chunk if needed
+            chunks.append(chunk)
+            
+            # Limit total rows
+            if len(chunks) * chunk_size > 100000:
+                break
+        
+        return pd.concat(chunks, ignore_index=True)
+    
+    # Memory-efficient sampling
+    def sample_large_dataset(df: pd.DataFrame, max_rows: int = 50000) -> pd.DataFrame:
+        if len(df) > max_rows:
+            st.warning(f"Large dataset detected ({len(df):,} rows). Sampling {max_rows:,} rows for analysis.")
+            return df.sample(n=max_rows, random_state=42)
+        return df
+    
+    # File size validation
+    MAX_FILE_SIZE = 100 * 1024 * 1024  # 100MB
+    
+    def validate_file_size(uploaded_file):
+        if uploaded_file.size > MAX_FILE_SIZE:
+            raise ValueError(f"File too large: {uploaded_file.size / 1024 / 1024:.1f}MB (max: {MAX_FILE_SIZE / 1024 / 1024:.1f}MB)")
+    ```
+  </Accordion>
+  
+  <Accordion title="Data Type Issues">
+    **Problem:** Incorrect data type detection
+    
+    **Common Issues:**
+    - Dates parsed as strings
+    - Numbers parsed as objects
+    - Mixed types in columns
+    
+    **Solutions:**
+    ```python
+    def optimize_data_types(df: pd.DataFrame) -> pd.DataFrame:
+        """Optimize DataFrame data types for better performance."""
+        
+        optimized_df = df.copy()
+        
+        for col in optimized_df.columns:
+            col_type = optimized_df[col].dtype
+            
+            # Convert object columns to category if low cardinality
+            if col_type == 'object':
+                unique_count = optimized_df[col].nunique()
+                total_count = len(optimized_df[col])
+                
+                if unique_count / total_count < 0.5:  # Less than 50% unique
+                    optimized_df[col] = optimized_df[col].astype('category')
+                    
+            # Downcast numeric types
+            elif col_type in ['int64', 'int32']:
+                optimized_df[col] = pd.to_numeric(optimized_df[col], downcast='integer')
+            elif col_type in ['float64', 'float32']:
+                optimized_df[col] = pd.to_numeric(optimized_df[col], downcast='float')
+        
+        return optimized_df
+    
+    # Auto-detect date columns
+    def detect_date_columns(df: pd.DataFrame) -> pd.DataFrame:
+        for col in df.select_dtypes(include=['object']).columns:
+            # Try to parse as datetime
+            try:
+                pd.to_datetime(df[col].dropna().head(100))
+                df[col] = pd.to_datetime(df[col], errors='coerce')
+                st.info(f"Converted column '{col}' to datetime")
+            except:
+                continue
+        return df
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Database Connection Issues
+
+<AccordionGroup>
+  <Accordion title="Connection Failures">
+    **Problem:** Cannot connect to database
+    
+    **Common Errors:**
+    ```
+    sqlalchemy.exc.OperationalError: could not connect to server
+    psycopg2.OperationalError: connection to server failed
+    ```
+    
+    **Diagnostic Steps:**
+    ```python
+    def diagnose_database_connection():
+        """Comprehensive database connection diagnosis."""
+        
+        tests = []
+        
+        # Test 1: Environment variables
+        required_vars = ['DATABASE_HOST', 'DATABASE_PORT', 'DATABASE_NAME', 'DATABASE_USER']
+        for var in required_vars:
+            value = os.getenv(var)
+            tests.append({
+                'test': f'Environment variable {var}',
+                'status': 'PASS' if value else 'FAIL',
+                'details': f'Value: {value}' if value else 'Not set'
+            })
+        
+        # Test 2: Network connectivity
+        try:
+            host = os.getenv('DATABASE_HOST')
+            port = int(os.getenv('DATABASE_PORT', 5432))
+            socket.create_connection((host, port), timeout=5)
+            tests.append({
+                'test': 'Network connectivity',
+                'status': 'PASS',
+                'details': f'Can reach {host}:{port}'
+            })
+        except Exception as e:
+            tests.append({
+                'test': 'Network connectivity',
+                'status': 'FAIL',
+                'details': str(e)
+            })
+        
+        # Test 3: Database driver
+        try:
+            import psycopg2  # or appropriate driver
+            tests.append({
+                'test': 'Database driver',
+                'status': 'PASS',
+                'details': 'Driver available'
+            })
+        except ImportError as e:
+            tests.append({
+                'test': 'Database driver',
+                'status': 'FAIL',
+                'details': f'Missing driver: {e}'
+            })
+        
+        return tests
+    ```
+    
+    **Common Solutions:**
+    ```bash
+    # Install database drivers
+    pip install psycopg2-binary  # PostgreSQL
+    pip install pymysql          # MySQL
+    pip install pyodbc           # SQL Server
+    
+    # Test connection manually
+    psql -h hostname -p 5432 -U username -d database_name
+    
+    # Check firewall/security groups
+    telnet hostname 5432
+    nc -zv hostname 5432
+    
+    # Verify SSL requirements
+    # Add to connection string:
+    # ?sslmode=require
+    # ?sslmode=disable
+    ```
+  </Accordion>
+  
+  <Accordion title="Query Execution Errors">
+    **Problem:** SQL queries fail or timeout
+    
+    **Common Issues:**
+    - Syntax errors in generated SQL
+    - Performance issues with large tables
+    - Permission denied errors
+    
+    **Solutions:**
+    ```python
+    # Query timeout handling
+    def execute_with_timeout(query: str, timeout: int = 30) -> pd.DataFrame:
+        """Execute query with timeout and retry logic."""
+        
+        engine = get_database_engine()
+        
+        try:
+            # Set statement timeout
+            with engine.connect() as conn:
+                conn.execute(text(f"SET statement_timeout = '{timeout}s'"))
+                result = pd.read_sql_query(query, conn)
+                return result
+                
+        except sqlalchemy.exc.OperationalError as e:
+            if "timeout" in str(e).lower():
+                # Try with LIMIT
+                limited_query = add_limit_to_query(query, 1000)
+                return execute_with_timeout(limited_query, timeout)
+            else:
+                raise
+    
+    # Query optimization
+    def optimize_query_for_large_table(query: str, table_name: str) -> str:
+        """Optimize query for large tables."""
+        
+        # Add LIMIT if not present
+        if "LIMIT" not in query.upper():
+            query += " LIMIT 10000"
+        
+        # Add time-based filtering for time series data
+        if has_date_column(table_name):
+            if "WHERE" not in query.upper():
+                query = query.replace(
+                    f"FROM {table_name}",
+                    f"FROM {table_name} WHERE date_column >= CURRENT_DATE - INTERVAL '30 days'"
+                )
+        
+        return query
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Streamlit Application Issues
+
+### Session State Problems
+
+<AccordionGroup>
+  <Accordion title="State Not Persisting">
+    **Problem:** Widget states reset unexpectedly
+    
+    **Symptoms:**
+    - Uploaded files disappear
+    - User inputs reset
+    - Analysis results lost
+    
+    **Solutions:**
+    ```python
+    # Proper session state initialization
+    def initialize_session_state():
+        """Initialize all session state variables."""
+        
+        defaults = {
+            'uploaded_file': None,
+            'df': None,
+            'analysis_history': [],
+            'database_connected': False,
+            'current_table': None
+        }
+        
+        for key, default_value in defaults.items():
+            if key not in st.session_state:
+                st.session_state[key] = default_value
+    
+    # Persistent file storage
+    def save_uploaded_file(uploaded_file) -> str:
+        """Save uploaded file to temporary location."""
+        
+        temp_dir = tempfile.mkdtemp()
+        file_path = os.path.join(temp_dir, uploaded_file.name)
+        
+        with open(file_path, "wb") as f:
+            f.write(uploaded_file.getbuffer())
+        
+        # Store path in session state
+        st.session_state['temp_file_path'] = file_path
+        
+        return file_path
+    
+    # Callback functions for state management
+    def on_file_upload():
+        """Callback when file is uploaded."""
+        if st.session_state.file_uploader is not None:
+            st.session_state.uploaded_file = st.session_state.file_uploader
+            st.session_state.df = None  # Reset DataFrame
+    
+    # Use callbacks with widgets
+    uploaded_file = st.file_uploader(
+        "Upload your data",
+        type=['csv', 'xlsx', 'json'],
+        key='file_uploader',
+        on_change=on_file_upload
+    )
+    ```
+  </Accordion>
+  
+  <Accordion title="Memory Leaks">
+    **Problem:** Application memory usage grows over time
+    
+    **Symptoms:**
+    - Slow performance after extended use
+    - Out of memory errors
+    - Browser tab crashes
+    
+    **Solutions:**
+    ```python
+    # Clean up cached data
+    def cleanup_memory():
+        """Clean up memory and temporary files."""
+        
+        # Clear Streamlit cache
+        st.cache_data.clear()
+        st.cache_resource.clear()
+        
+        # Clean up temporary files
+        if 'temp_files' in st.session_state:
+            for temp_file in st.session_state.temp_files:
+                try:
+                    os.unlink(temp_file)
+                except FileNotFoundError:
+                    pass
+            st.session_state.temp_files = []
+        
+        # Reset large DataFrames
+        for key in ['df', 'analysis_results', 'cached_data']:
+            if key in st.session_state:
+                del st.session_state[key]
+    
+    # Implement periodic cleanup
+    if st.button("🧹 Clean Memory"):
+        cleanup_memory()
+        st.success("Memory cleaned successfully!")
+        st.experimental_rerun()
+    
+    # Automatic cleanup on file change
+    def auto_cleanup():
+        """Automatic cleanup when switching datasets."""
+        if 'previous_file_hash' in st.session_state:
+            current_hash = hash(str(st.session_state.get('uploaded_file')))
+            if current_hash != st.session_state.previous_file_hash:
+                cleanup_memory()
+                st.session_state.previous_file_hash = current_hash
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Performance Optimization
+
+<AccordionGroup>
+  <Accordion title="Slow Loading Times">
+    **Problem:** Application takes long time to load
+    
+    **Solutions:**
+    ```python
+    # Optimize imports
+    import streamlit as st
+    
+    # Lazy import heavy libraries
+    def get_plotly():
+        import plotly.express as px
+        import plotly.graph_objects as go
+        return px, go
+    
+    def get_seaborn():
+        import seaborn as sns
+        return sns
+    
+    # Cache expensive operations
+    @st.cache_data(ttl=3600)  # Cache for 1 hour
+    def load_and_process_data(file_path: str):
+        """Load and process data with caching."""
+        df = pd.read_csv(file_path)
+        return optimize_data_types(df)
+    
+    @st.cache_resource
+    def get_database_connection():
+        """Cached database connection."""
+        return create_engine(connection_string)
+    
+    # Pagination for large results
+    def paginate_dataframe(df: pd.DataFrame, page_size: int = 100):
+        """Paginate large DataFrames."""
+        
+        total_pages = len(df) // page_size + (1 if len(df) % page_size > 0 else 0)
+        
+        if total_pages > 1:
+            page = st.selectbox(
+                f"Page (showing {page_size} rows per page)",
+                range(1, total_pages + 1)
+            )
+            
+            start_idx = (page - 1) * page_size
+            end_idx = start_idx + page_size
+            
+            return df.iloc[start_idx:end_idx]
+        else:
+            return df
+    ```
+  </Accordion>
+  
+  <Accordion title="UI Responsiveness">
+    **Problem:** Interface becomes unresponsive
+    
+    **Solutions:**
+    ```python
+    # Use progress bars for long operations
+    def long_running_analysis(df: pd.DataFrame):
+        """Analysis with progress tracking."""
+        
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        
+        # Step 1: Data validation
+        status_text.text("Validating data...")
+        validate_data(df)
+        progress_bar.progress(25)
+        
+        # Step 2: Statistical analysis
+        status_text.text("Computing statistics...")
+        stats = compute_statistics(df)
+        progress_bar.progress(50)
+        
+        # Step 3: Generate visualizations
+        status_text.text("Creating visualizations...")
+        charts = create_charts(df)
+        progress_bar.progress(75)
+        
+        # Step 4: AI analysis
+        status_text.text("Running AI analysis...")
+        ai_insights = generate_ai_insights(df)
+        progress_bar.progress(100)
+        
+        status_text.text("Analysis complete!")
+        return stats, charts, ai_insights
+    
+    # Asynchronous operations with spinner
+    with st.spinner("Processing your request..."):
+        result = expensive_operation()
+    
+    # Break up heavy operations
+    def process_in_chunks(data, chunk_size=1000):
+        """Process data in chunks to maintain responsiveness."""
+        
+        results = []
+        total_chunks = len(data) // chunk_size + 1
+        
+        for i, chunk in enumerate(chunks(data, chunk_size)):
+            with st.spinner(f"Processing chunk {i+1}/{total_chunks}..."):
+                result = process_chunk(chunk)
+                results.append(result)
+                
+                # Allow UI to update
+                time.sleep(0.01)
+        
+        return combine_results(results)
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Logging and Debugging
+
+### Enable Debug Logging
+
+```python
+import logging
+import sys
+
+# Configure logging
+def setup_logging():
+    """Setup comprehensive logging for debugging."""
+    
+    # Create formatter
+    formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+    
+    # File handler
+    file_handler = logging.FileHandler('tableai_app.log')
+    file_handler.setFormatter(formatter)
+    file_handler.setLevel(logging.DEBUG)
+    
+    # Console handler
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setFormatter(formatter)
+    console_handler.setLevel(logging.INFO)
+    
+    # Root logger
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.DEBUG)
+    root_logger.addHandler(file_handler)
+    root_logger.addHandler(console_handler)
+    
+    # Specific loggers
+    logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
+    logging.getLogger('streamlit').setLevel(logging.WARNING)
+
+# Enable debug mode
+if os.getenv('DEBUG', 'false').lower() == 'true':
+    setup_logging()
+    st.set_option('client.showErrorDetails', True)
+```
+
+### Debug Information Panel
+
+```python
+def show_debug_info():
+    """Display debug information panel."""
+    
+    if st.checkbox("🐛 Show Debug Info"):
+        with st.expander("Debug Information", expanded=True):
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.write("**Session State:**")
+                st.json(dict(st.session_state))
+                
+                st.write("**Environment Variables:**")
+                env_vars = {k: v for k, v in os.environ.items() 
+                           if 'TABLEAI' in k or 'DATABASE' in k or 'OLLAMA' in k}
+                st.json(env_vars)
+            
+            with col2:
+                st.write("**System Information:**")
+                system_info = {
+                    'Python Version': sys.version,
+                    'Streamlit Version': st.__version__,
+                    'Pandas Version': pd.__version__,
+                    'Platform': platform.platform(),
+                    'CPU Count': os.cpu_count(),
+                    'Memory (GB)': round(psutil.virtual_memory().total / (1024**3), 2)
+                }
+                st.json(system_info)
+                
+                st.write("**Recent Logs:**")
+                try:
+                    with open('tableai_app.log', 'r') as f:
+                        logs = f.readlines()[-20:]  # Last 20 lines
+                        st.text('\n'.join(logs))
+                except FileNotFoundError:
+                    st.text("No log file found")
+```
+
+## Getting Help
+
+### Self-Diagnosis Checklist
+
+Before seeking help, run through this checklist:
+
+<Steps>
+  <Step title="Check Requirements">
+    - [ ] Python 3.8+ installed
+    - [ ] All dependencies installed
+    - [ ] Virtual environment activated
+  </Step>
+  <Step title="Verify Configuration">
+    - [ ] Environment variables set
+    - [ ] Ollama service running
+    - [ ] Models downloaded
+    - [ ] Database accessible (if using)
+  </Step>
+  <Step title="Test Basic Functions">
+    - [ ] Application starts without errors
+    - [ ] File upload works
+    - [ ] AI responses generate
+    - [ ] Visualizations render
+  </Step>
+  <Step title="Check Resources">
+    - [ ] Sufficient memory available
+    - [ ] Disk space adequate
+    - [ ] Network connectivity stable
+  </Step>
+</Steps>
+
+### Collecting Debug Information
+
+When reporting issues, include:
+
+```bash
+# System information
+python --version
+pip list
+df -h
+free -h
+
+# Application logs
+tail -n 50 tableai_app.log
+
+# Ollama status
+ollama list
+ollama ps
+
+# Network tests
+curl http://localhost:11434/api/version
+ping database-host
+
+# Environment variables (sanitized)
+env | grep -E "(TABLEAI|DATABASE|OLLAMA)" | sed 's/PASSWORD=.*/PASSWORD=***/'
+```
+
+### Common Error Codes
+
+| Error Code | Description | Common Solution |
+|------------|-------------|-----------------|
+| `ERR_001` | Python version incompatible | Upgrade to Python 3.8+ |
+| `ERR_002` | Package import failed | Reinstall requirements |
+| `ERR_003` | Ollama connection failed | Start Ollama service |
+| `ERR_004` | Model not found | Pull required model |
+| `ERR_005` | Database connection failed | Check credentials/connectivity |
+| `ERR_006` | File upload failed | Check file format/size |
+| `ERR_007` | Memory exceeded | Reduce dataset size |
+| `ERR_008` | Query timeout | Optimize query/add limits |
+
+This troubleshooting guide should help you resolve most common issues with TableAI. For additional support, check the project documentation or submit an issue with detailed error information.

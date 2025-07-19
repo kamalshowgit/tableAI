@@ -1,0 +1,424 @@
+---
+title: 'Data Upload & File Handling'
+description: 'Complete guide to TableAI file upload and data processing capabilities'
+---
+
+## Overview
+
+TableAI supports multiple data input methods with robust file handling and format detection. The system processes files securely while maintaining data integrity and user privacy.
+
+## Supported File Formats
+
+<CardGroup cols={3}>
+  <Card
+    title="CSV Files"
+    icon="file-csv"
+  >
+    Comma-separated values with automatic delimiter detection
+  </Card>
+  <Card
+    title="Excel Files"
+    icon="file-excel"
+  >
+    XLSX and XLS formats with sheet selection
+  </Card>
+  <Card
+    title="TSV Files"
+    icon="file-lines"
+  >
+    Tab-separated values for structured data
+  </Card>
+  <Card
+    title="Parquet Files"
+    icon="database"
+  >
+    Columnar storage format for large datasets
+  </Card>
+  <Card
+    title="JSON Files"
+    icon="file-code"
+  >
+    JavaScript Object Notation with nested structure support
+  </Card>
+  <Card
+    title="Database Export"
+    icon="download"
+  >
+    Direct exports from various database systems
+  </Card>
+</CardGroup>
+
+## File Upload Process
+
+### Step 1: File Selection
+
+The upload interface provides drag-and-drop functionality with file type validation:
+
+```python
+uploaded_file = st.file_uploader(
+    "Choose a file", 
+    type=["csv", "xlsx", "xls", "tsv", "parquet", "json"]
+)
+```
+
+**Features:**
+- Drag and drop support
+- Multiple file type validation
+- File size limitations (configurable)
+- Real-time upload progress
+
+### Step 2: Temporary Storage
+
+Files are securely stored in temporary locations:
+
+```python
+def save_and_get_temp_path(uploaded_file: Any) -> str:
+    ext = os.path.splitext(uploaded_file.name)[-1]
+    temp_path = os.path.join(
+        tempfile.gettempdir(), 
+        f"st_{uuid.uuid4().hex}{ext}"
+    )
+    with open(temp_path, "wb") as f:
+        f.write(uploaded_file.getbuffer())
+    logger.info(f"Saved uploaded file to temp path: {temp_path}")
+    return temp_path
+```
+
+**Security Features:**
+- UUID-based unique filenames
+- Temporary directory isolation
+- Automatic cleanup after processing
+- No permanent storage of user data
+
+### Step 3: Data Loading
+
+Format-specific loading with error handling:
+
+```python
+def load_dataframe_from_temp(temp_path: str) -> pd.DataFrame:
+    ext = temp_path.lower()
+    try:
+        if ext.endswith(".csv"):
+            return pd.read_csv(temp_path)
+        elif ext.endswith(".tsv"):
+            return pd.read_csv(temp_path, sep='\t')
+        elif ext.endswith(".xlsx") or ext.endswith(".xls"):
+            return pd.read_excel(temp_path)
+        elif ext.endswith(".parquet"):
+            return pd.read_parquet(temp_path)
+        elif ext.endswith(".json"):
+            return pd.read_json(temp_path)
+        else:
+            raise ValueError("Unsupported file format.")
+    except Exception as e:
+        logger.error(f"Error loading file: {e}")
+        st.error(f"Error loading file: {e}")
+        return pd.DataFrame()
+```
+
+## Format-Specific Handling
+
+### CSV Files
+
+<AccordionGroup>
+  <Accordion title="Standard CSV">
+    ```python
+    # Automatic detection of:
+    # - Delimiter (comma, semicolon, pipe)
+    # - Quote character
+    # - Header presence
+    # - Encoding (UTF-8, Latin-1, etc.)
+    
+    df = pd.read_csv(temp_path)
+    ```
+  </Accordion>
+  
+  <Accordion title="Custom Separators">
+    ```python
+    # TSV files use tab separator
+    df = pd.read_csv(temp_path, sep='\t')
+    
+    # Other separators handled automatically
+    # or with user specification
+    ```
+  </Accordion>
+  
+  <Accordion title="Encoding Issues">
+    ```python
+    # Automatic fallback encoding detection
+    try:
+        df = pd.read_csv(temp_path, encoding='utf-8')
+    except UnicodeDecodeError:
+        df = pd.read_csv(temp_path, encoding='latin-1')
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Excel Files
+
+**Features:**
+- Multi-sheet workbook support
+- Automatic sheet selection (first sheet by default)
+- Header row detection
+- Data type inference
+- Formula evaluation
+
+```python
+# Basic Excel loading
+df = pd.read_excel(temp_path)
+
+# Advanced options (configurable)
+df = pd.read_excel(
+    temp_path,
+    sheet_name=0,        # First sheet
+    header=0,            # First row as header
+    skiprows=0,          # No rows to skip
+    dtype=None           # Auto-detect types
+)
+```
+
+### JSON Files
+
+**Supported Structures:**
+- Records format: `[{...}, {...}]`
+- Values format: `{"col1": [...], "col2": [...]}`
+- Index format: `{"0": {...}, "1": {...}}`
+- Split format: `{"index": [...], "columns": [...], "data": [...]}`
+
+```python
+# Automatic format detection
+df = pd.read_json(temp_path)
+
+# Handles nested JSON structures
+# Flattens complex objects when possible
+```
+
+### Parquet Files
+
+**Advantages:**
+- Columnar storage for efficiency
+- Built-in compression
+- Schema preservation
+- Fast read/write operations
+
+```python
+# High-performance loading
+df = pd.read_parquet(temp_path)
+
+# Preserves:
+# - Data types
+# - Index information
+# - Column metadata
+```
+
+## Data Preview System
+
+After successful upload, TableAI provides immediate data preview:
+
+### Preview Components
+
+<Steps>
+  <Step title="Data Summary">
+    - Row and column counts
+    - Data types for each column
+    - Memory usage information
+    - Missing value counts
+  </Step>
+  
+  <Step title="Sample Data">
+    ```python
+    # Shows first 5 rows by default
+    st.session_state['df_preview'] = df.head()
+    st.session_state['df_columns'] = list(df.columns)
+    st.session_state['df_source'] = f"File: {uploaded_file.name}"
+    ```
+  </Step>
+  
+  <Step title="Column Information">
+    - Column names and data types
+    - Unique value counts
+    - Basic statistics for numeric columns
+    - Sample values for categorical columns
+  </Step>
+</Steps>
+
+### Interactive Preview
+
+```python
+# Display with full-width container
+st.dataframe(st.session_state['df_preview'], use_container_width=True)
+
+# Column information display
+st.write(f"**Columns:** {', '.join(st.session_state['df_columns'])}")
+st.write(f"**Source:** {st.session_state['df_source']}")
+```
+
+## Error Handling & Validation
+
+### File Validation
+
+<CodeGroup>
+
+```python Size Limits
+# Configurable file size limits
+MAX_FILE_SIZE = 200 * 1024 * 1024  # 200MB default
+
+if uploaded_file.size > MAX_FILE_SIZE:
+    st.error(f"File too large. Maximum size: {MAX_FILE_SIZE/1024/1024:.0f}MB")
+```
+
+```python Format Validation
+# File extension validation
+SUPPORTED_FORMATS = [".csv", ".xlsx", ".xls", ".tsv", ".parquet", ".json"]
+file_ext = os.path.splitext(uploaded_file.name)[1].lower()
+
+if file_ext not in SUPPORTED_FORMATS:
+    st.error(f"Unsupported format: {file_ext}")
+```
+
+```python Content Validation
+# Basic content validation
+def validate_dataframe(df: pd.DataFrame) -> bool:
+    if df.empty:
+        st.error("File contains no data")
+        return False
+    
+    if len(df.columns) == 0:
+        st.error("File contains no columns")
+        return False
+        
+    return True
+```
+
+</CodeGroup>
+
+### Common Issues & Solutions
+
+<AccordionGroup>
+  <Accordion title="Encoding Problems">
+    **Issue:** Non-UTF-8 characters causing decode errors
+    
+    **Solution:** Automatic encoding detection and fallback
+    ```python
+    encodings = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']
+    for encoding in encodings:
+        try:
+            df = pd.read_csv(temp_path, encoding=encoding)
+            break
+        except UnicodeDecodeError:
+            continue
+    ```
+  </Accordion>
+  
+  <Accordion title="Malformed CSV">
+    **Issue:** Inconsistent columns, quotes, or delimiters
+    
+    **Solution:** Robust parsing with error recovery
+    ```python
+    df = pd.read_csv(
+        temp_path,
+        error_bad_lines=False,    # Skip bad lines
+        warn_bad_lines=True,      # Warn about issues
+        quoting=csv.QUOTE_ALL     # Handle quotes
+    )
+    ```
+  </Accordion>
+  
+  <Accordion title="Large Files">
+    **Issue:** Memory limitations with large datasets
+    
+    **Solution:** Chunked processing and sampling
+    ```python
+    # For very large files, read in chunks
+    chunk_size = 10000
+    chunks = pd.read_csv(temp_path, chunksize=chunk_size)
+    df = pd.concat([chunk for chunk in chunks])
+    
+    # Or sample for preview
+    df_sample = df.sample(n=1000) if len(df) > 1000 else df
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Performance Optimization
+
+### Memory Management
+
+```python
+# Efficient data type optimization
+def optimize_dtypes(df: pd.DataFrame) -> pd.DataFrame:
+    # Convert object columns to category when beneficial
+    for col in df.select_dtypes(include=['object']):
+        if df[col].nunique() / len(df) < 0.5:  # < 50% unique values
+            df[col] = df[col].astype('category')
+    
+    # Downcast numeric types
+    df = df.apply(pd.to_numeric, downcast='integer', errors='ignore')
+    df = df.apply(pd.to_numeric, downcast='float', errors='ignore')
+    
+    return df
+```
+
+### Caching Strategy
+
+```python
+# Session state caching for processed data
+if 'processed_data' not in st.session_state:
+    st.session_state['processed_data'] = {}
+
+# Cache expensive operations
+@st.cache_data
+def process_large_file(file_path: str) -> pd.DataFrame:
+    return pd.read_csv(file_path)
+```
+
+## Best Practices
+
+### For Users
+
+<Tip>
+**Clean Data**: Ensure consistent column names and data formats for best results
+</Tip>
+
+<Tip>
+**File Size**: Keep files under 200MB for optimal performance
+</Tip>
+
+<Tip>
+**Headers**: Include clear, descriptive column headers in the first row
+</Tip>
+
+### For Developers
+
+<Warning>
+**Security**: Always validate file content and sanitize data before processing
+</Warning>
+
+<Warning>
+**Memory**: Monitor memory usage for large files and implement chunked processing
+</Warning>
+
+## Integration with AI Analysis
+
+Once data is loaded, it seamlessly integrates with the AI analyst:
+
+```python
+# Data schema for AI context
+schema = "\n".join([f"- {col}: {str(dtype)}" 
+                   for col, dtype in zip(df.columns, df.dtypes)])
+
+# Sample rows for AI understanding
+sample_rows = df.head(3).to_dict(orient="records")
+
+# AI prompt generation
+system_prompt = f"""
+Data schema:
+{schema}
+
+Sample rows: {sample_rows}
+
+Generate Python code to analyze this data...
+"""
+```
+
+This integration allows the AI to understand your data structure and generate appropriate analysis code.
