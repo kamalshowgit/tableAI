@@ -46,8 +46,10 @@ except ImportError:
     missing_packages.append('matplotlib')
 try:
     import plotly.graph_objs as go
+    plotly_available = True
 except ImportError:
     missing_packages.append('plotly')
+    plotly_available = False
 try:
     import sqlalchemy
 except ImportError:
@@ -304,11 +306,6 @@ def load_dataframe_from_temp(temp_path: str) -> pd.DataFrame:
 def render_analyst_output(ai_output: Any) -> None:
     import pandas as pd
     import matplotlib.pyplot as plt
-    try:
-        import plotly.graph_objs as go
-        plotly_available = True
-    except ImportError:
-        plotly_available = False
     if ai_output is None:
         st.markdown("<div class='terminal-output'><span style='font-size:0.98rem; color:#00ff5f; font-style:italic;'>-Your output will be generated here.-</span></div>", unsafe_allow_html=True)
     elif isinstance(ai_output, pd.DataFrame):
@@ -571,8 +568,8 @@ else:
                 )
             try:
                 with st.spinner("AI is generating code and answer..."):
-                    llm = Ollama(model=OLLAMA_MODEL, request_timeout=120)
-                    embed_model = OllamaEmbedding(model_name=OLLAMA_EMBED_MODEL)
+                    llm = get_llm()
+                    embed_model = get_embed_model()
                     doc_text = (
                         f"Data schema:\n{schema}\nSample rows: {sample_rows}\n"
                         f"User question: {user_question}\n"
@@ -876,11 +873,6 @@ else:
             output_loading = st.session_state.get('analyst_output_loading', False)
             ai_output = st.session_state.get('analyst_last_output', None)
             import matplotlib.pyplot as plt
-            try:
-                import plotly.graph_objs as go
-                plotly_available = True
-            except ImportError:
-                plotly_available = False
             if output_loading:
                 # Context-aware filler for output
                 if user_q:
@@ -904,14 +896,14 @@ else:
             else:
                 render_analyst_output(ai_output)
 
-# --- Code Execution Safety ---
-# WARNING: Executing AI-generated code with exec/eval is inherently risky. For production, consider using a sandboxed environment or RestrictedPython for extra safety.
 
 # --- Model/Embedding Caching ---
-# Example usage (uncomment and use in ask_analyst):
-# @st.cache_resource
-# def get_llm():
-#     return Ollama(model=OLLAMA_MODEL, request_timeout=120)
-# @st.cache_resource
-# def get_embed_model():
-#     return OllamaEmbedding(model_name=OLLAMA_EMBED_MODEL)
+@st.cache_resource
+def get_llm():
+    """Get cached LLM instance for better performance."""
+    return Ollama(model=OLLAMA_MODEL, request_timeout=120)
+
+@st.cache_resource 
+def get_embed_model():
+    """Get cached embedding model instance for better performance."""
+    return OllamaEmbedding(model_name=OLLAMA_EMBED_MODEL)
