@@ -7,13 +7,14 @@ import uuid
 import contextlib
 import io
 import logging
+from typing import Optional, Any
 
 # --- Third-Party Imports ---
 import streamlit as st
 import pandas as pd
+from dotenv import load_dotenv
 
 # --- Load environment variables ---
-from dotenv import load_dotenv
 load_dotenv()
 
 # --- Logging Configuration ---
@@ -26,6 +27,7 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__)
+
 # LlamaIndex/Ollama imports
 from llama_index.llms.ollama import Ollama
 from llama_index.core import SimpleDirectoryReader
@@ -35,7 +37,6 @@ from llama_index.embeddings.ollama import OllamaEmbedding
 # --- Configurable Model Names (from .env or fallback) ---
 OLLAMA_MODEL = os.getenv('OLLAMA_MODEL', 'mistral')
 OLLAMA_EMBED_MODEL = os.getenv('OLLAMA_EMBED_MODEL', 'mistral')
-
 
 # --- Startup: Check for required packages ---
 missing_packages = []
@@ -247,7 +248,7 @@ if not ('show_analyst' in st.session_state and st.session_state['show_analyst'])
         st.info("For best results, use clean tabular data. If you see errors, check your file format and column names.")
 
 
-def clean_ai_code(code):
+def clean_ai_code(code: str) -> str:
     """
     Post-process AI-generated code to fix common mistakes and improve safety.
     - Fix common matplotlib argument errors (labels -> label)
@@ -271,7 +272,7 @@ def clean_ai_code(code):
     logger.debug("AI code cleaned for safety.")
     return code.strip()
 
-def save_and_get_temp_path(uploaded_file):
+def save_and_get_temp_path(uploaded_file: Any) -> str:
     ext = os.path.splitext(uploaded_file.name)[-1]
     temp_path = os.path.join(tempfile.gettempdir(), f"st_{uuid.uuid4().hex}{ext}")
     with open(temp_path, "wb") as f:
@@ -279,7 +280,7 @@ def save_and_get_temp_path(uploaded_file):
     logger.info(f"Saved uploaded file to temp path: {temp_path}")
     return temp_path
 
-def load_dataframe_from_temp(temp_path):
+def load_dataframe_from_temp(temp_path: str) -> pd.DataFrame:
     ext = temp_path.lower()
     try:
         if ext.endswith(".csv"):
@@ -299,6 +300,58 @@ def load_dataframe_from_temp(temp_path):
         st.error(f"Error loading file: {e}")
         return pd.DataFrame()
 
+# --- Output Rendering Helper ---
+def render_analyst_output(ai_output: Any) -> None:
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    try:
+        import plotly.graph_objs as go
+        plotly_available = True
+    except ImportError:
+        plotly_available = False
+    if ai_output is None:
+        st.markdown("<div class='terminal-output'><span style='font-size:0.98rem; color:#00ff5f; font-style:italic;'>-Your output will be generated here.-</span></div>", unsafe_allow_html=True)
+    elif isinstance(ai_output, pd.DataFrame):
+        max_rows = 1000
+        if len(ai_output) > max_rows:
+            st.warning(f"Output DataFrame has {len(ai_output)} rows. Showing only the first {max_rows} rows.")
+            st.dataframe(ai_output.head(max_rows), use_container_width=True)
+        else:
+            st.dataframe(ai_output, use_container_width=True)
+    elif isinstance(ai_output, str) and 'File read detected:' in ai_output:
+        st.markdown(f"<div class='terminal-output'>{ai_output}</div>", unsafe_allow_html=True)
+    elif hasattr(ai_output, 'to_dict') and not isinstance(ai_output, str):
+        st.write(ai_output)
+    elif isinstance(ai_output, (int, float, str)):
+        st.markdown(f"<div class='terminal-output'>{ai_output}</div>", unsafe_allow_html=True)
+    elif hasattr(ai_output, 'figure') or hasattr(ai_output, 'show'):
+        try:
+            st.pyplot(ai_output)
+        except Exception:
+            if plotly_available:
+                try:
+                    st.plotly_chart(ai_output)
+                except Exception:
+                    st.markdown("<div class='terminal-output'>[Graph output could not be rendered]</div>", unsafe_allow_html=True)
+            else:
+                st.markdown("<div class='terminal-output'>[Plotly not installed. Graph output could not be rendered]</div>", unsafe_allow_html=True)
+    elif isinstance(ai_output, dict) and ai_output.get('type') == 'plot':
+        fig = ai_output.get('figure')
+        if fig is not None:
+            try:
+                st.pyplot(fig)
+            except Exception:
+                if plotly_available:
+                    try:
+                        st.plotly_chart(fig)
+                    except Exception:
+                        st.markdown("<div class='terminal-output'>[Graph output could not be rendered]</div>", unsafe_allow_html=True)
+                else:
+                    st.markdown("<div class='terminal-output'>[Plotly not installed. Graph output could not be rendered]</div>", unsafe_allow_html=True)
+        else:
+            st.markdown("<div class='terminal-output'>[No figure found in output]</div>", unsafe_allow_html=True)
+    else:
+        st.markdown(f"<div class='terminal-output'>{str(ai_output)}</div>", unsafe_allow_html=True)
 
 # --- State: Only show preview after load ---
 if 'df_preview' not in st.session_state:
@@ -823,9 +876,9 @@ else:
             output_loading = st.session_state.get('analyst_output_loading', False)
             ai_output = st.session_state.get('analyst_last_output', None)
             import matplotlib.pyplot as plt
-            plotly_available = True
             try:
                 import plotly.graph_objs as go
+                plotly_available = True
             except ImportError:
                 plotly_available = False
             if output_loading:
@@ -848,50 +901,17 @@ else:
 </style>
 """, unsafe_allow_html=True)
                 st.markdown(f"<div class='terminal-output'><span style='font-size:0.98rem; color:#00ff5f; font-style:italic;'>{output_filler}</span></div>", unsafe_allow_html=True)
-            elif not ai_output:
-                st.markdown("<div class='terminal-output'><span style='font-size:0.98rem; color:#00ff5f; font-style:italic;'>-Your output will be generated here.-</span></div>", unsafe_allow_html=True)
-            elif isinstance(ai_output, pd.DataFrame):
-                max_rows = 1000
-                if len(ai_output) > max_rows:
-                    st.warning(f"Output DataFrame has {len(ai_output)} rows. Showing only the first {max_rows} rows.")
-                    st.dataframe(ai_output.head(max_rows), use_container_width=True)
-                else:
-                    st.dataframe(ai_output, use_container_width=True)
-            elif isinstance(ai_output, str) and 'File read detected:' in ai_output:
-                st.markdown(f"<div class='terminal-output'>{ai_output}</div>", unsafe_allow_html=True)
-            elif hasattr(ai_output, 'to_dict') and not isinstance(ai_output, str):
-                st.write(ai_output)
-            elif isinstance(ai_output, (int, float, str)):
-                st.markdown(f"<div class='terminal-output'>{ai_output}</div>", unsafe_allow_html=True)
-            elif hasattr(ai_output, 'figure') or hasattr(ai_output, 'show'):
-                try:
-                    st.pyplot(ai_output)
-                except Exception:
-                    if plotly_available:
-                        try:
-                            st.plotly_chart(ai_output)
-                        except Exception:
-                            st.markdown("<div class='terminal-output'>[Graph output could not be rendered]</div>", unsafe_allow_html=True)
-                    else:
-                        st.markdown("<div class='terminal-output'>[Plotly not installed. Graph output could not be rendered]</div>", unsafe_allow_html=True)
-            elif isinstance(ai_output, dict) and ai_output.get('type') == 'plot':
-                fig = ai_output.get('figure')
-                if fig is not None:
-                    try:
-                        st.pyplot(fig)
-                    except Exception:
-                        if plotly_available:
-                            try:
-                                st.plotly_chart(fig)
-                            except Exception:
-                                st.markdown("<div class='terminal-output'>[Graph output could not be rendered]</div>", unsafe_allow_html=True)
-                        else:
-                            st.markdown("<div class='terminal-output'>[Plotly not installed. Graph output could not be rendered]</div>", unsafe_allow_html=True)
-                else:
-                    st.markdown("<div class='terminal-output'>[No figure found in output]</div>", unsafe_allow_html=True)
             else:
-<<<<<<< HEAD
-                st.markdown(f"<div class='terminal-output'>{str(ai_output)}</div>", unsafe_allow_html=True)
-=======
-                st.markdown(f"<div class='terminal-output'>{str(ai_output)}</div>", unsafe_allow_html=True)
->>>>>>> 52585a0763044c83baa0425f98081f8da8257139
+                render_analyst_output(ai_output)
+
+# --- Code Execution Safety ---
+# WARNING: Executing AI-generated code with exec/eval is inherently risky. For production, consider using a sandboxed environment or RestrictedPython for extra safety.
+
+# --- Model/Embedding Caching ---
+# Example usage (uncomment and use in ask_analyst):
+# @st.cache_resource
+# def get_llm():
+#     return Ollama(model=OLLAMA_MODEL, request_timeout=120)
+# @st.cache_resource
+# def get_embed_model():
+#     return OllamaEmbedding(model_name=OLLAMA_EMBED_MODEL)

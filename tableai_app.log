@@ -1,0 +1,61 @@
+2025-07-16 03:08:33,640 INFO __main__ Connected to DB: SQLite, Tables: []
+2025-07-16 03:08:44,109 INFO __main__ Connected to DB: SQLite, Tables: []
+2025-07-16 03:08:51,160 INFO __main__ Connected to DB: SQLite, Tables: []
+2025-07-16 03:08:58,542 INFO __main__ Connected to DB: SQLite, Tables: []
+2025-07-16 03:11:46,304 ERROR __main__ Error connecting to database: (sqlite3.DatabaseError) database disk image is malformed
+[SQL: SELECT name FROM sqlite_master WHERE type='table';]
+(Background on this error at: https://sqlalche.me/e/20/4xp6)
+2025-07-16 03:12:45,862 INFO __main__ Connected to DB: SQLite, Tables: []
+2025-07-16 03:15:08,622 INFO __main__ Connected to DB: SQLite, Tables: ['employees']
+2025-07-16 03:15:29,516 INFO httpx HTTP Request: POST http://localhost:11434/api/embeddings "HTTP/1.1 200 OK"
+2025-07-16 03:15:29,585 INFO httpx HTTP Request: POST http://localhost:11434/api/show "HTTP/1.1 200 OK"
+2025-07-16 03:15:29,806 INFO httpx HTTP Request: POST http://localhost:11434/api/embeddings "HTTP/1.1 200 OK"
+2025-07-16 03:15:40,309 INFO httpx HTTP Request: POST http://localhost:11434/api/chat "HTTP/1.1 200 OK"
+2025-07-16 03:15:40,740 INFO __main__ AI generated code for question: who are above 29 age?
+2025-07-16 20:40:40,941 INFO __main__ Connected to DB: SQLite, Tables: []
+2025-07-16 20:40:59,436 INFO __main__ Connected to DB: SQLite, Tables: ['employees']
+2025-07-16 20:48:09,045 INFO __main__ Connected to DB: SQLite, Tables: ['employees']
+2025-07-16 20:48:32,904 INFO __main__ Saved uploaded file to temp path: /var/folders/nl/p7q82crd34527mnv_0stbnt80000gn/T/st_3178ff527e364500a8eff9cef23b9532.csv
+2025-07-16 20:50:01,588 INFO __main__ Saved uploaded file to temp path: /var/folders/nl/p7q82crd34527mnv_0stbnt80000gn/T/st_57fa5c6e4b6047d19d51df56e16566b7.csv
+2025-07-16 20:53:36,655 INFO __main__ Saved uploaded file to temp path: /var/folders/nl/p7q82crd34527mnv_0stbnt80000gn/T/st_43d80f0acf694162a5721f7f768cdb12.csv
+2025-07-16 20:54:30,237 INFO __main__ Saved uploaded file to temp path: /var/folders/nl/p7q82crd34527mnv_0stbnt80000gn/T/st_bb01468919404c06b4549e9f3d5711cb.csv
+2025-07-16 20:55:46,463 INFO __main__ Saved uploaded file to temp path: /var/folders/nl/p7q82crd34527mnv_0stbnt80000gn/T/st_66ce0a7afb5f467689c1b4cb60f92c8d.csv
+2025-07-16 20:56:29,733 INFO __main__ Saved uploaded file to temp path: /var/folders/nl/p7q82crd34527mnv_0stbnt80000gn/T/st_4834765790164efb935325778dda91b1.csv
+2025-07-16 20:57:06,282 INFO __main__ Saved uploaded file to temp path: /var/folders/nl/p7q82crd34527mnv_0stbnt80000gn/T/st_812cbecbb1714163b97c97b8d40d8923.csv
+2025-07-16 21:00:05,808 INFO __main__ Saved uploaded file to temp path: /var/folders/nl/p7q82crd34527mnv_0stbnt80000gn/T/st_37cbf779e23940bab3693658d086ab2b.csv
+2025-07-16 21:00:34,497 INFO __main__ Connected to DB: SQLite, Tables: ['employees']
+2025-07-16 21:02:30,500 INFO __main__ Saved uploaded file to temp path: /var/folders/nl/p7q82crd34527mnv_0stbnt80000gn/T/st_868274164f514e8d9cefeb040055c423.csv
+2025-07-16 21:17:25,160 INFO __main__ Saved uploaded file to temp path: /var/folders/nl/p7q82crd34527mnv_0stbnt80000gn/T/st_b4d5e04155c443b7bd68550eac2f08d4.csv
+2025-07-16 21:17:40,314 INFO httpx HTTP Request: POST http://localhost:11434/api/embeddings "HTTP/1.1 200 OK"
+2025-07-16 21:17:40,385 INFO httpx HTTP Request: POST http://localhost:11434/api/show "HTTP/1.1 200 OK"
+2025-07-16 21:17:40,674 INFO httpx HTTP Request: POST http://localhost:11434/api/embeddings "HTTP/1.1 200 OK"
+2025-07-16 21:17:55,064 INFO httpx HTTP Request: POST http://localhost:11434/api/chat "HTTP/1.1 200 OK"
+2025-07-16 21:17:55,201 INFO __main__ AI generated code for question: who has highest salary?
+2025-07-16 21:32:17,119 INFO __main__ Saved uploaded file to temp path: /var/folders/nl/p7q82crd34527mnv_0stbnt80000gn/T/st_20e665a85c8547389742c5ec1b151d2b.csv
+2025-07-16 21:32:50,692 INFO httpx HTTP Request: POST http://localhost:11434/api/embeddings "HTTP/1.1 200 OK"
+2025-07-16 21:32:50,898 INFO httpx HTTP Request: POST http://localhost:11434/api/show "HTTP/1.1 200 OK"
+2025-07-16 21:32:51,306 INFO httpx HTTP Request: POST http://localhost:11434/api/embeddings "HTTP/1.1 200 OK"
+2025-07-16 21:33:29,240 INFO httpx HTTP Request: POST http://localhost:11434/api/chat "HTTP/1.1 200 OK"
+2025-07-16 21:33:29,677 INFO __main__ AI generated code for question: who has highest salary?
+2025-07-16 21:34:09,727 INFO httpx HTTP Request: POST http://localhost:11434/api/embeddings "HTTP/1.1 200 OK"
+2025-07-16 21:34:09,806 INFO httpx HTTP Request: POST http://localhost:11434/api/show "HTTP/1.1 200 OK"
+2025-07-16 21:34:10,476 INFO httpx HTTP Request: POST http://localhost:11434/api/embeddings "HTTP/1.1 200 OK"
+2025-07-16 21:34:36,047 INFO httpx HTTP Request: POST http://localhost:11434/api/chat "HTTP/1.1 200 OK"
+2025-07-16 21:34:36,322 INFO __main__ AI generated code for question: draw a graph between age and salary
+2025-07-16 21:35:02,909 INFO __main__ Connected to DB: SQLite, Tables: ['employees']
+2025-07-16 21:35:35,012 INFO httpx HTTP Request: POST http://localhost:11434/api/embeddings "HTTP/1.1 200 OK"
+2025-07-16 21:35:35,061 INFO httpx HTTP Request: POST http://localhost:11434/api/show "HTTP/1.1 200 OK"
+2025-07-16 21:35:35,483 INFO httpx HTTP Request: POST http://localhost:11434/api/embeddings "HTTP/1.1 200 OK"
+2025-07-16 21:35:56,972 INFO httpx HTTP Request: POST http://localhost:11434/api/chat "HTTP/1.1 200 OK"
+2025-07-16 21:35:57,186 INFO __main__ AI generated code for question: What is the joining date for Charlie?
+2025-07-16 21:36:39,853 INFO httpx HTTP Request: POST http://localhost:11434/api/embeddings "HTTP/1.1 200 OK"
+2025-07-16 21:36:39,944 INFO httpx HTTP Request: POST http://localhost:11434/api/show "HTTP/1.1 200 OK"
+2025-07-16 21:36:40,369 INFO httpx HTTP Request: POST http://localhost:11434/api/embeddings "HTTP/1.1 200 OK"
+2025-07-16 21:37:04,727 INFO httpx HTTP Request: POST http://localhost:11434/api/chat "HTTP/1.1 200 OK"
+2025-07-16 21:37:05,019 INFO __main__ AI generated code for question: in which department maximum employees are there?
+2025-07-16 21:38:12,201 INFO __main__ Connected to DB: SQLite, Tables: ['employees']
+2025-07-16 21:38:40,441 INFO httpx HTTP Request: POST http://localhost:11434/api/embeddings "HTTP/1.1 200 OK"
+2025-07-16 21:38:40,486 INFO httpx HTTP Request: POST http://localhost:11434/api/show "HTTP/1.1 200 OK"
+2025-07-16 21:38:41,176 INFO httpx HTTP Request: POST http://localhost:11434/api/embeddings "HTTP/1.1 200 OK"
+2025-07-16 21:39:10,690 INFO httpx HTTP Request: POST http://localhost:11434/api/chat "HTTP/1.1 200 OK"
+2025-07-16 21:39:11,108 INFO __main__ AI generated code for question: which department has maximum employees?
