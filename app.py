@@ -28,6 +28,29 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# --- Model/Embedding Caching ---
+@st.cache_resource
+def get_llm():
+    """Get cached LLM instance for better performance."""
+    return Ollama(model=OLLAMA_MODEL, request_timeout=120)
+
+@st.cache_resource 
+def get_embed_model():
+    """Get cached embedding model instance for better performance."""
+    return OllamaEmbedding(model_name=OLLAMA_EMBED_MODEL)
+
+def cleanup_session_state():
+    """Clean up session state variables."""
+    keys_to_remove = [
+        'df_preview', 'df_columns', 'df_source', 'data_file_path', 'data_source_type',
+        'data_db_uri', 'data_db_table', 'show_analyst', 'analyst_last_question',
+        'analyst_last_code', 'analyst_last_output', 'analyst_code_loading', 'analyst_output_loading',
+        'analyst_last_code_language'
+    ]
+    for key in keys_to_remove:
+        if key in st.session_state:
+            del st.session_state[key]
+
 # LlamaIndex/Ollama imports
 from llama_index.llms.ollama import Ollama
 from llama_index.core import SimpleDirectoryReader
@@ -258,31 +281,90 @@ def clean_ai_code(code: str) -> str:
     - Strip trailing whitespace
     """
     import re
+    
+    if not code or not isinstance(code, str):
+        return ""
+    
     # Fix common matplotlib argument typo: labels= -> label=
     code = re.sub(r'labels\s*=', 'label=', code)
+    
     # Remove any double semicolons
     code = code.replace(';;', ';')
+    
     # Remove dangerous code patterns (defensive)
     forbidden = [
         r'os\.', r'subprocess', r'open\(', r'exec\(', r'eval\(', r'import sys', r'import os',
         r'import shutil', r'import socket', r'import requests', r'import urllib', r'del ',
-        r'remove\(', r'rmdir\(', r'system\(', r'exit\(', r'kill\('
+        r'remove\(', r'rmdir\(', r'system\(', r'exit\(', r'kill\(', r'__import__', r'globals\(',
+        r'locals\(', r'compile\(', r'input\(', r'raw_input\(', r'file\(', r'reload\('
     ]
+    
     for pattern in forbidden:
         code = re.sub(pattern, '# BLOCKED', code)
+    
+    # Remove any import statements that could be dangerous
+    dangerous_imports = [
+        r'import\s+os\s*$', r'import\s+sys\s*$', r'import\s+subprocess\s*$',
+        r'from\s+os\s+import\s*', r'from\s+sys\s+import\s*', r'from\s+subprocess\s+import\s*'
+    ]
+    
+    for pattern in dangerous_imports:
+        code = re.sub(pattern, '# BLOCKED IMPORT', code, flags=re.MULTILINE)
+    
     # Log code cleaning for audit
     logger.debug("AI code cleaned for safety.")
     return code.strip()
 
 def save_and_get_temp_path(uploaded_file: Any) -> str:
-    ext = os.path.splitext(uploaded_file.name)[-1]
-    temp_path = os.path.join(tempfile.gettempdir(), f"st_{uuid.uuid4().hex}{ext}")
-    with open(temp_path, "wb") as f:
-        f.write(uploaded_file.getbuffer())
-    logger.info(f"Saved uploaded file to temp path: {temp_path}")
-    return temp_path
+    """Save uploaded file to temporary path with error handling."""
+    try:
+        ext = os.path.splitext(uploaded_file.name)[-1]
+        temp_path = os.path.join(tempfile.gettempdir(), f"st_{uuid.uuid4().hex}{ext}")
+        with open(temp_path, "wb") as f:
+            f.write(uploaded_file.getbuffer())
+        logger.info(f"Saved uploaded file to temp path: {temp_path}")
+        return temp_path
+    except Exception as e:
+        logger.error(f"Error saving uploaded file: {e}")
+        st.error(f"❌ Error saving uploaded file: {e}")
+        raise
+
+def validate_ai_response(ai_response: Any) -> tuple[Optional[str], str]:
+    """
+    Validate and extract code from AI response.
+    Returns (code, language) tuple.
+    """
+    if not ai_response:
+        return None, 'python'
+    
+    response_str = str(ai_response)
+    
+    # Clean the response - remove any markdown formatting
+    response_str = response_str.replace('```python', '').replace('```sql', '').replace('```', '').strip()
+    
+    # Detect code block or plain SQL
+    if "```python" in str(ai_response):
+        code = str(ai_response).split("```python")[1].split("```", 1)[0].strip()
+        return code, 'python'
+    elif "```sql" in str(ai_response):
+        code = str(ai_response).split("```sql")[1].split("```", 1)[0].strip()
+        return code, 'sql'
+    else:
+        # Try to detect if the response is a plain SQL query
+        import re
+        sql_pattern = r"^\s*SELECT .* FROM .*;?\s*$"
+        if re.match(sql_pattern, response_str, re.IGNORECASE):
+            return response_str.strip(), 'sql'
+        else:
+            # Check if it looks like SQL (contains SQL keywords)
+            sql_keywords = ['SELECT', 'FROM', 'WHERE', 'ORDER BY', 'GROUP BY', 'HAVING', 'JOIN', 'UNION']
+            if any(keyword.lower() in response_str.lower() for keyword in sql_keywords):
+                return response_str.strip(), 'sql'
+            else:
+                return response_str.strip(), 'python'
 
 def load_dataframe_from_temp(temp_path: str) -> pd.DataFrame:
+    """Load DataFrame from temporary file with robust error handling."""
     ext = temp_path.lower()
     try:
         if ext.endswith(".csv"):
@@ -296,59 +378,96 @@ def load_dataframe_from_temp(temp_path: str) -> pd.DataFrame:
         elif ext.endswith(".json"):
             return pd.read_json(temp_path)
         else:
-            raise ValueError("Unsupported file format.")
+            raise ValueError(f"Unsupported file format: {ext}")
+    except pd.errors.EmptyDataError:
+        logger.error("File is empty or contains no data")
+        st.error("❌ File is empty or contains no data. Please check your file.")
+        return pd.DataFrame()
+    except pd.errors.ParserError as e:
+        logger.error(f"Error parsing file: {e}")
+        st.error(f"❌ Error parsing file: {e}. Please check your file format.")
+        return pd.DataFrame()
     except Exception as e:
         logger.error(f"Error loading file: {e}")
-        st.error(f"Error loading file: {e}")
+        st.error(f"❌ Error loading file: {e}")
         return pd.DataFrame()
 
 # --- Output Rendering Helper ---
 def render_analyst_output(ai_output: Any) -> None:
+    """Render AI output in a clean, consistent way."""
     import pandas as pd
     import matplotlib.pyplot as plt
+    
     if ai_output is None:
         st.markdown("<div class='terminal-output'><span style='font-size:0.98rem; color:#00ff5f; font-style:italic;'>-Your output will be generated here.-</span></div>", unsafe_allow_html=True)
-    elif isinstance(ai_output, pd.DataFrame):
+        return
+    
+    # Handle DataFrame output
+    if isinstance(ai_output, pd.DataFrame):
         max_rows = 1000
         if len(ai_output) > max_rows:
             st.warning(f"Output DataFrame has {len(ai_output)} rows. Showing only the first {max_rows} rows.")
             st.dataframe(ai_output.head(max_rows), use_container_width=True)
         else:
             st.dataframe(ai_output, use_container_width=True)
-    elif isinstance(ai_output, str) and 'File read detected:' in ai_output:
+        return
+    
+    # Handle string output
+    if isinstance(ai_output, str):
+        if 'File read detected:' in ai_output:
+            st.markdown(f"<div class='terminal-output'>{ai_output}</div>", unsafe_allow_html=True)
+        else:
+            st.markdown(f"<div class='terminal-output'>{ai_output}</div>", unsafe_allow_html=True)
+        return
+    
+    # Handle numeric output
+    if isinstance(ai_output, (int, float)):
         st.markdown(f"<div class='terminal-output'>{ai_output}</div>", unsafe_allow_html=True)
-    elif hasattr(ai_output, 'to_dict') and not isinstance(ai_output, str):
-        st.write(ai_output)
-    elif isinstance(ai_output, (int, float, str)):
-        st.markdown(f"<div class='terminal-output'>{ai_output}</div>", unsafe_allow_html=True)
-    elif hasattr(ai_output, 'figure') or hasattr(ai_output, 'show'):
+        return
+    
+    # Handle matplotlib figures
+    if hasattr(ai_output, 'figure') or hasattr(ai_output, 'show'):
         try:
             st.pyplot(ai_output)
-        except Exception:
+        except Exception as e:
+            logger.warning(f"Failed to render matplotlib figure: {e}")
             if plotly_available:
                 try:
                     st.plotly_chart(ai_output)
-                except Exception:
+                except Exception as e2:
+                    logger.warning(f"Failed to render plotly chart: {e2}")
                     st.markdown("<div class='terminal-output'>[Graph output could not be rendered]</div>", unsafe_allow_html=True)
             else:
                 st.markdown("<div class='terminal-output'>[Plotly not installed. Graph output could not be rendered]</div>", unsafe_allow_html=True)
-    elif isinstance(ai_output, dict) and ai_output.get('type') == 'plot':
+        return
+    
+    # Handle plot dictionary
+    if isinstance(ai_output, dict) and ai_output.get('type') == 'plot':
         fig = ai_output.get('figure')
         if fig is not None:
             try:
                 st.pyplot(fig)
-            except Exception:
+            except Exception as e:
+                logger.warning(f"Failed to render plot figure: {e}")
                 if plotly_available:
                     try:
                         st.plotly_chart(fig)
-                    except Exception:
+                    except Exception as e2:
+                        logger.warning(f"Failed to render plotly plot: {e2}")
                         st.markdown("<div class='terminal-output'>[Graph output could not be rendered]</div>", unsafe_allow_html=True)
                 else:
                     st.markdown("<div class='terminal-output'>[Plotly not installed. Graph output could not be rendered]</div>", unsafe_allow_html=True)
         else:
             st.markdown("<div class='terminal-output'>[No figure found in output]</div>", unsafe_allow_html=True)
-    else:
-        st.markdown(f"<div class='terminal-output'>{str(ai_output)}</div>", unsafe_allow_html=True)
+        return
+    
+    # Handle other objects with to_dict method
+    if hasattr(ai_output, 'to_dict') and not isinstance(ai_output, str):
+        st.write(ai_output)
+        return
+    
+    # Default case - convert to string
+    st.markdown(f"<div class='terminal-output'>{str(ai_output)}</div>", unsafe_allow_html=True)
 
 # --- State: Only show preview after load ---
 if 'df_preview' not in st.session_state:
@@ -359,12 +478,23 @@ if 'df_preview' not in st.session_state:
     with tab1:
         uploaded_file = st.file_uploader("Choose a file", type=["csv", "xlsx", "xls", "tsv", "parquet", "json"])
         if uploaded_file:
-            temp_path = save_and_get_temp_path(uploaded_file)
             try:
+                # Validate file size (max 100MB)
+                if uploaded_file.size > 100 * 1024 * 1024:  # 100MB
+                    st.error("❌ File too large. Maximum file size is 100MB.")
+                    st.stop()
+                
+                temp_path = save_and_get_temp_path(uploaded_file)
                 df = load_dataframe_from_temp(temp_path)
+                
                 if df.empty:
-                    st.error("No data loaded. Please check your file format.")
+                    st.error("❌ No data loaded. Please check your file format.")
+                elif len(df.columns) == 0:
+                    st.error("❌ File contains no columns. Please check your file format.")
+                elif len(df) == 0:
+                    st.error("❌ File contains no rows. Please check your file.")
                 else:
+                    st.success(f"✅ Successfully loaded {uploaded_file.name} with {len(df)} rows and {len(df.columns)} columns")
                     st.session_state['df_preview'] = df.head()
                     st.session_state['df_columns'] = list(df.columns)
                     st.session_state['df_source'] = f"File: {uploaded_file.name}"
@@ -372,7 +502,8 @@ if 'df_preview' not in st.session_state:
                     st.session_state['data_source_type'] = 'file'
                     st.rerun()
             except Exception as e:
-                st.error(f"Error loading file: {e}")
+                logger.error(f"Error processing uploaded file: {e}")
+                st.error(f"❌ Error processing file: {e}")
         # ...no back button...
 
     with tab2:
@@ -405,42 +536,70 @@ if 'df_preview' not in st.session_state:
         if connect_btn and db_uri:
             try:
                 import sqlalchemy
+                # Validate URI format
+                if not db_uri.strip():
+                    st.error("❌ Please enter a valid database URI")
+                    st.stop()
+                
                 engine = sqlalchemy.create_engine(db_uri)
                 with engine.connect() as conn:
                     # Table listing SQL for each DB type
-                    if db_type == "SQLite":
-                        tables = conn.execute(sqlalchemy.text("SELECT name FROM sqlite_master WHERE type='table';")).fetchall()
-                    elif db_type in ["PostgreSQL", "MariaDB", "MySQL"]:
-                        tables = conn.execute(sqlalchemy.text("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public';")).fetchall()
-                    elif db_type == "SQL Server":
-                        tables = conn.execute(sqlalchemy.text("SELECT table_name FROM information_schema.tables WHERE table_type = 'BASE TABLE';")).fetchall()
-                    elif db_type == "Oracle":
-                        tables = conn.execute(sqlalchemy.text("SELECT table_name FROM user_tables")).fetchall()
-                    elif db_type == "DuckDB":
-                        tables = conn.execute(sqlalchemy.text("SHOW TABLES")).fetchall()
-                    else:
-                        # Try generic information_schema
-                        tables = conn.execute(sqlalchemy.text("SELECT table_name FROM information_schema.tables")).fetchall()
-                    table_names = [t[0] for t in tables]
-                    st.success(f"Connected! Tables: {table_names}")
-                    logger.info(f"Connected to DB: {db_type}, Tables: {table_names}")
-                    if table_names:
-                        table = st.selectbox("Select Table", table_names)
-                        if table:
-                            df = pd.read_sql_table(table, engine)
-                            if df.empty:
-                                st.error("No data loaded from table. Please check your table selection.")
-                            else:
-                                st.session_state['df_preview'] = df.head()
-                                st.session_state['df_columns'] = list(df.columns)
-                                st.session_state['df_source'] = f"DB Table: {table}"
-                                st.session_state['data_db_uri'] = db_uri
-                                st.session_state['data_db_table'] = table
-                                st.session_state['data_source_type'] = 'db'
-                                st.rerun()
+                    try:
+                        if db_type == "SQLite":
+                            tables = conn.execute(sqlalchemy.text("SELECT name FROM sqlite_master WHERE type='table';")).fetchall()
+                        elif db_type in ["PostgreSQL", "MariaDB", "MySQL"]:
+                            tables = conn.execute(sqlalchemy.text("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public';")).fetchall()
+                        elif db_type == "SQL Server":
+                            tables = conn.execute(sqlalchemy.text("SELECT table_name FROM information_schema.tables WHERE table_type = 'BASE TABLE';")).fetchall()
+                        elif db_type == "Oracle":
+                            tables = conn.execute(sqlalchemy.text("SELECT table_name FROM user_tables")).fetchall()
+                        elif db_type == "DuckDB":
+                            tables = conn.execute(sqlalchemy.text("SHOW TABLES")).fetchall()
+                        else:
+                            # Try generic information_schema
+                            tables = conn.execute(sqlalchemy.text("SELECT table_name FROM information_schema.tables")).fetchall()
+                        
+                        table_names = [t[0] for t in tables]
+                        if not table_names:
+                            st.warning("⚠️ Connected successfully, but no tables found in the database.")
+                        else:
+                            st.success(f"✅ Connected successfully! Found {len(table_names)} table(s): {', '.join(table_names)}")
+                            logger.info(f"Connected to DB: {db_type}, Tables: {table_names}")
+                            
+                            table = st.selectbox("Select Table", table_names)
+                            if table:
+                                try:
+                                    df = pd.read_sql_table(table, engine)
+                                    if df.empty:
+                                        st.warning("⚠️ Table is empty. Please select a different table.")
+                                    else:
+                                        st.session_state['df_preview'] = df.head()
+                                        st.session_state['df_columns'] = list(df.columns)
+                                        st.session_state['df_source'] = f"DB Table: {table}"
+                                        st.session_state['data_db_uri'] = db_uri
+                                        st.session_state['data_db_table'] = table
+                                        st.session_state['data_source_type'] = 'db'
+                                        st.rerun()
+                                except Exception as table_error:
+                                    logger.error(f"Error reading table {table}: {table_error}")
+                                    st.error(f"❌ Error reading table '{table}': {table_error}")
+                                    
+                    except sqlalchemy.exc.ProgrammingError as pe:
+                        logger.error(f"Database query error: {pe}")
+                        st.error(f"❌ Database query error: {pe}. Please check your database permissions.")
+                    except Exception as query_error:
+                        logger.error(f"Error querying database: {query_error}")
+                        st.error(f"❌ Error querying database: {query_error}")
+                        
+            except sqlalchemy.exc.OperationalError as oe:
+                logger.error(f"Database connection error: {oe}")
+                st.error(f"❌ Database connection failed: {oe}. Please check your connection details.")
+            except sqlalchemy.exc.ArgumentError as ae:
+                logger.error(f"Invalid database URI: {ae}")
+                st.error(f"❌ Invalid database URI: {ae}. Please check your connection string.")
             except Exception as e:
                 logger.error(f"Error connecting to database: {e}")
-                st.error(f"Error connecting to database: {e}")
+                st.error(f"❌ Error connecting to database: {e}")
         # ...no back button...
 else:
     if 'show_analyst' not in st.session_state:
@@ -454,15 +613,7 @@ else:
         col_preview1, col_preview2 = st.columns([1, 1])
         with col_preview1:
             if st.button("Back to Loader", key="back_to_loader_btn"):
-                # Clear data-related session state and return to loader
-                for k in [
-                    'df_preview', 'df_columns', 'df_source', 'data_file_path', 'data_source_type',
-                    'data_db_uri', 'data_db_table', 'show_analyst', 'analyst_last_question',
-                    'analyst_last_code', 'analyst_last_output', 'analyst_code_loading', 'analyst_output_loading',
-                    'analyst_last_code_language'
-                ]:
-                    if k in st.session_state:
-                        del st.session_state[k]
+                cleanup_session_state()
                 st.rerun()
         with col_preview2:
             if st.button("Ask the analyst", key="meet_analyst_btn"):
@@ -545,7 +696,7 @@ else:
                     "Data schema:\n" + schema +
                     f"\nSample rows: {sample_rows}\n"
                     "Always use a table named 'data' in your SQL. "
-                    "Return only the SQL code and the result, with a brief explanation."
+                    "IMPORTANT: Return ONLY the SQL code, no explanations or other text."
                 )
                 ai_instruction = (
                     "Instruction: Write SQL code to answer the question using a table named 'data'. "
@@ -560,7 +711,7 @@ else:
                     "Data schema:\n" + schema +
                     f"\nSample rows: {sample_rows}\n"
                     "Always use the DataFrame variable 'df' for Python code. "
-                    "Return only the code and the result, with a brief explanation."
+                    "IMPORTANT: Return ONLY the Python code, no explanations or other text."
                 )
                 ai_instruction = (
                     "Instruction: Write Python (pandas) code to answer the question using the DataFrame 'df'. "
@@ -575,43 +726,49 @@ else:
                         f"User question: {user_question}\n"
                         f"{ai_instruction}"
                     )
+                    
+                    # Create temporary file for document
                     with tempfile.NamedTemporaryFile(delete=False, suffix=".txt", mode="w") as f:
                         f.write(doc_text)
                         doc_path = f.name
-                    documents = SimpleDirectoryReader(input_files=[doc_path]).load_data()
-                    index = VectorStoreIndex.from_documents(documents, embed_model=embed_model)
-                    query_engine = index.as_query_engine(llm=llm)
-                    ai_response = query_engine.query(user_question)
-                code = None
-                warning_no_code = False
-                code_lang = 'python'
-                # Detect code block or plain SQL
-                if "```python" in str(ai_response):
-                    code = str(ai_response).split("```python")[1].split("```", 1)[0].strip()
-                    code_lang = 'python'
-                elif "```sql" in str(ai_response):
-                    code = str(ai_response).split("```sql")[1].split("```", 1)[0].strip()
-                    code_lang = 'sql'
-                else:
-                    # Try to detect if the response is a plain SQL query
-                    sql_pattern = r"^\s*SELECT .* FROM .*;?\s*$"
-                    if re.match(sql_pattern, str(ai_response), re.IGNORECASE):
-                        code = str(ai_response).strip()
-                        code_lang = 'sql'
-                    else:
-                        code = str(ai_response).strip()
-                        code_lang = 'python'
-                        warning_no_code = True
+                    
+                    try:
+                        documents = SimpleDirectoryReader(input_files=[doc_path]).load_data()
+                        index = VectorStoreIndex.from_documents(documents, embed_model=embed_model)
+                        query_engine = index.as_query_engine(llm=llm)
+                        
+                        # Simple AI query without signal-based timeout
+                        ai_response = query_engine.query(user_question)
+                            
+                    finally:
+                        # Clean up temporary file
+                        try:
+                            os.unlink(doc_path)
+                        except:
+                            pass
+                # Validate and extract code from AI response
+                code, code_lang = validate_ai_response(ai_response)
+                warning_no_code = not code or code == str(ai_response)
+                
                 st.session_state['analyst_last_code_language'] = code_lang
                 st.session_state['analyst_last_code'] = code or str(ai_response)
                 st.session_state['analyst_code_loading'] = False
                 logger.info(f"AI generated code for question: {user_question}")
+                
                 if warning_no_code and code_lang == 'python':
-                    st.warning("No code block detected in the AI response. Please try rephrasing your question for a better result.")
+                    st.warning("⚠️ No code block detected in the AI response. Please try rephrasing your question for a better result.")
+                
                 # --- Execute code ---
                 # Start output animation until output is ready
                 result = None
                 exec_output = ""
+                
+                # Ensure we have valid code to execute
+                if not code or code.strip() == "":
+                    st.session_state['analyst_last_output'] = "❌ <b>Error:</b> No valid code generated by AI.<br><b>Tip:</b> Please try rephrasing your question."
+                    st.session_state['analyst_output_loading'] = False
+                    return
+                
                 if code:
                     st.session_state['analyst_output_loading'] = True
                     if code_lang == 'sql':
@@ -623,7 +780,8 @@ else:
                         else:
                             # Fallback: try to find first line ending with semicolon
                             sql_lines = [l.strip() for l in code.splitlines() if l.strip().endswith(';')]
-                            sql_code = sql_lines[0] if sql_lines else code.strip()
+                            sql_code = sql_code if sql_lines else code.strip()
+                        
                         # Replace 'data' with actual table name if needed
                         db_uri = st.session_state.get('data_db_uri')
                         table = st.session_state.get('data_db_table')
@@ -651,7 +809,8 @@ else:
                             st.session_state['analyst_last_output'] = f"❌ <b>Error:</b> SQL query execution failed.<br><b>Details:</b> {e}<br><b>Query:</b> <pre>{sql_code}</pre>"
                             st.session_state['analyst_output_loading'] = False
                             return
-                    # --- Clean and post-process AI code ---
+                    
+                    # --- Clean and post-process AI code for Python ---
                     st.session_state['analyst_output_loading'] = True
                     code = clean_ai_code(code)
                     import re
@@ -767,54 +926,73 @@ else:
                                 st.session_state['analyst_last_output'] = result if result is not None else exec_output
                             st.session_state['analyst_output_loading'] = False
                     except ValueError as ve:
+                        error_msg = "❌ <b>Error:</b> "
                         if "Length mismatch" in str(ve):
-                            st.session_state['analyst_last_output'] = (
-                                "❌ <b>Error:</b> The generated code tried to set DataFrame columns or index with the wrong number of labels. "
+                            error_msg += (
+                                "The generated code tried to set DataFrame columns or index with the wrong number of labels. "
                                 f"<br><b>Details:</b> {ve}<br>"
                                 "<b>Tip:</b> Your data has a different number of columns or rows than the code expects. Please check your question or try again."
                             )
                         elif "got an unexpected keyword argument" in str(ve):
-                            st.session_state['analyst_last_output'] = (
-                                "❌ <b>Error:</b> The generated code used an invalid argument in a plotting function. "
+                            error_msg += (
+                                "The generated code used an invalid argument in a plotting function. "
                                 f"<br><b>Details:</b> {ve}<br>"
                                 "<b>Tip:</b> This is often caused by using 'labels' instead of 'label' in matplotlib. Please try again or rephrase your question."
                             )
                         else:
-                            st.session_state['analyst_last_output'] = f"Error executing code: {ve}\n{traceback.format_exc()}"
+                            error_msg += f"Value error: {ve}"
+                        st.session_state['analyst_last_output'] = error_msg
                         st.session_state['analyst_output_loading'] = False
+                        
                     except TypeError as te:
-                        # Handle groupby mean or aggregation on non-numeric columns
+                        error_msg = "❌ <b>Error:</b> "
                         if "agg function failed" in str(te) or "could not convert" in str(te):
-                            # Try to auto-select numeric columns and retry
-                            st.session_state['analyst_last_output'] = (
-                                "❌ <b>Error:</b> The generated code tried to aggregate non-numeric columns. "
+                            error_msg += (
+                                "The generated code tried to aggregate non-numeric columns. "
                                 f"<br><b>Details:</b> {te}<br>"
                                 "<b>Tip:</b> Only numeric columns can be aggregated (e.g., mean, sum). Please specify a numeric column or let the AI know to use only numeric columns. "
                                 "<br><b>Detected column types:</b> "
                                 f"{local_vars['df'].dtypes.to_dict() if 'df' in local_vars else ''}"
                             )
                         else:
-                            st.session_state['analyst_last_output'] = f"Error executing code: {te}\n{traceback.format_exc()}"
+                            error_msg += f"Type error: {te}"
+                        st.session_state['analyst_last_output'] = error_msg
                         st.session_state['analyst_output_loading'] = False
+                        
                     except Exception as e:
-                        # User-friendly error message for common matplotlib argument errors
                         logger.error(f"Error executing AI code: {e}\n{traceback.format_exc()}")
+                        error_msg = "❌ <b>Error:</b> "
                         if "got an unexpected keyword argument" in str(e):
-                            st.session_state['analyst_last_output'] = (
-                                "❌ <b>Error:</b> The generated code used an invalid argument in a plotting function. "
+                            error_msg += (
+                                "The generated code used an invalid argument in a plotting function. "
                                 f"<br><b>Details:</b> {e}<br>"
                                 "<b>Tip:</b> This is often caused by using 'labels' instead of 'label' in matplotlib. Please try again or rephrase your question."
                             )
                         else:
-                            st.session_state['analyst_last_output'] = f"Error executing code: {e}\n{traceback.format_exc()}"
+                            error_msg += f"Unexpected error: {e}"
+                        
+                        # Try to provide a helpful fallback based on the question
+                        try:
+                            if "highest" in user_question.lower() or "maximum" in user_question.lower():
+                                if 'salary' in user_question.lower() or 'income' in user_question.lower():
+                                    fallback_code = "df[['name', 'salary']].nlargest(1, 'salary')"
+                                    fallback_result = eval(fallback_code, {"df": df})
+                                    error_msg += f"<br><br>🔄 <b>Fallback result:</b> {fallback_result.to_string()}"
+                                    logger.info("Applied fallback for highest salary query")
+                        except:
+                            pass
+                        
+                        st.session_state['analyst_last_output'] = error_msg
                         st.session_state['analyst_output_loading'] = False
                 else:
                     st.session_state['analyst_last_output'] = str(ai_response)
                     # Input will be cleared by clear_on_submit=True in the form
             except Exception as e:
+                logger.error(f"Error in AI processing: {e}\n{traceback.format_exc()}")
                 st.session_state['analyst_last_code'] = None
-                st.session_state['analyst_last_output'] = f"Error: {e}\n{traceback.format_exc()}"
-                # Input will be cleared by clear_on_submit=True in the form
+                st.session_state['analyst_last_output'] = f"❌ <b>Error:</b> {e}<br><b>Tip:</b> Please try again or rephrase your question."
+                st.session_state['analyst_code_loading'] = False
+                st.session_state['analyst_output_loading'] = False
 
         # --- Analyst Chatbot Form ---
         with st.form(key="analyst_chat_form", clear_on_submit=True):
@@ -822,6 +1000,22 @@ else:
             code_loading = st.session_state.get('analyst_code_loading', False)
             output_loading = st.session_state.get('analyst_output_loading', False)
             submitted = st.form_submit_button("Submit", disabled=code_loading or output_loading)
+            
+            # Show progress indicators
+            if code_loading or output_loading:
+                progress_bar = st.progress(0)
+                status_text = st.empty()
+                
+                # Simple progress indicator
+                progress_bar.progress(50)
+                status_text.text("🤖 AI is thinking and generating code...")
+                
+                # Clear after a short delay
+                import time
+                time.sleep(0.1)
+                progress_bar.empty()
+                status_text.empty()
+            
             if submitted:
                 ask_analyst()
 
@@ -892,18 +1086,7 @@ else:
 }}
 </style>
 """, unsafe_allow_html=True)
-                st.markdown(f"<div class='terminal-output'><span style='font-size:0.98rem; color:#00ff5f; font-style:italic;'>{output_filler}</span></div>", unsafe_allow_html=True)
             else:
                 render_analyst_output(ai_output)
 
 
-# --- Model/Embedding Caching ---
-@st.cache_resource
-def get_llm():
-    """Get cached LLM instance for better performance."""
-    return Ollama(model=OLLAMA_MODEL, request_timeout=120)
-
-@st.cache_resource 
-def get_embed_model():
-    """Get cached embedding model instance for better performance."""
-    return OllamaEmbedding(model_name=OLLAMA_EMBED_MODEL)

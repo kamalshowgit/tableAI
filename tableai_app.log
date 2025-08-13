@@ -59,3 +59,77 @@
 2025-07-16 21:38:41,176 INFO httpx HTTP Request: POST http://localhost:11434/api/embeddings "HTTP/1.1 200 OK"
 2025-07-16 21:39:10,690 INFO httpx HTTP Request: POST http://localhost:11434/api/chat "HTTP/1.1 200 OK"
 2025-07-16 21:39:11,108 INFO __main__ AI generated code for question: which department has maximum employees?
+2025-08-14 01:18:09,978 INFO __main__ Connected to DB: SQLite, Tables: ['employees']
+2025-08-14 01:26:27,127 INFO __main__ Connected to DB: SQLite, Tables: ['employees']
+2025-08-14 01:26:38,926 ERROR __main__ Error in AI processing: name 'get_llm' is not defined
+Traceback (most recent call last):
+  File "/Users/kamalsoni/Desktop/Work/Local AI/app.py", line 692, in ask_analyst
+    llm = get_llm()
+          ^^^^^^^
+NameError: name 'get_llm' is not defined
+
+2025-08-14 01:28:58,163 INFO __main__ Connected to DB: SQLite, Tables: ['employees']
+2025-08-14 01:29:10,118 ERROR __main__ Error in AI processing: name 'get_llm' is not defined
+Traceback (most recent call last):
+  File "/Users/kamalsoni/Desktop/Work/Local AI/app.py", line 692, in ask_analyst
+    llm = get_llm()
+          ^^^^^^^
+NameError: name 'get_llm' is not defined
+
+2025-08-14 01:30:35,422 INFO __main__ Connected to DB: SQLite, Tables: ['employees']
+2025-08-14 01:31:00,763 INFO httpx HTTP Request: POST http://localhost:11434/api/embed "HTTP/1.1 200 OK"
+2025-08-14 01:31:00,779 INFO httpx HTTP Request: POST http://localhost:11434/api/show "HTTP/1.1 200 OK"
+2025-08-14 01:31:00,781 ERROR __main__ Error in AI processing: signal only works in main thread of the main interpreter
+Traceback (most recent call last):
+  File "/Users/kamalsoni/Desktop/Work/Local AI/app.py", line 739, in ask_analyst
+    signal.signal(signal.SIGALRM, timeout_handler)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/signal.py", line 58, in signal
+    handler = _signal.signal(_enum_to_int(signalnum), _enum_to_int(handler))
+ValueError: signal only works in main thread of the main interpreter
+
+2025-08-14 01:31:25,893 INFO httpx HTTP Request: POST http://localhost:11434/api/embed "HTTP/1.1 200 OK"
+2025-08-14 01:31:25,899 ERROR __main__ Error in AI processing: signal only works in main thread of the main interpreter
+Traceback (most recent call last):
+  File "/Users/kamalsoni/Desktop/Work/Local AI/app.py", line 739, in ask_analyst
+    signal.signal(signal.SIGALRM, timeout_handler)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/signal.py", line 58, in signal
+    handler = _signal.signal(_enum_to_int(signalnum), _enum_to_int(handler))
+ValueError: signal only works in main thread of the main interpreter
+
+2025-08-14 01:32:00,725 INFO __main__ Connected to DB: SQLite, Tables: ['employees']
+2025-08-14 01:32:11,580 INFO httpx HTTP Request: POST http://localhost:11434/api/embed "HTTP/1.1 200 OK"
+2025-08-14 01:32:11,592 INFO httpx HTTP Request: POST http://localhost:11434/api/show "HTTP/1.1 200 OK"
+2025-08-14 01:32:11,593 ERROR __main__ Error in AI processing: signal only works in main thread of the main interpreter
+Traceback (most recent call last):
+  File "/Users/kamalsoni/Desktop/Work/Local AI/app.py", line 739, in ask_analyst
+    signal.signal(signal.SIGALRM, timeout_handler)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/signal.py", line 58, in signal
+    handler = _signal.signal(_enum_to_int(signalnum), _enum_to_int(handler))
+ValueError: signal only works in main thread of the main interpreter
+
+2025-08-14 01:37:17,894 INFO __main__ Connected to DB: SQLite, Tables: ['employees']
+2025-08-14 01:37:33,652 INFO httpx HTTP Request: POST http://localhost:11434/api/embed "HTTP/1.1 200 OK"
+2025-08-14 01:37:33,675 INFO httpx HTTP Request: POST http://localhost:11434/api/show "HTTP/1.1 200 OK"
+2025-08-14 01:37:34,012 INFO httpx HTTP Request: POST http://localhost:11434/api/embed "HTTP/1.1 200 OK"
+2025-08-14 01:37:44,304 INFO httpx HTTP Request: POST http://localhost:11434/api/chat "HTTP/1.1 200 OK"
+2025-08-14 01:37:44,321 INFO __main__ AI generated code for question: who have the highest salary?
+2025-08-14 01:37:44,325 ERROR __main__ Error executing AI code: invalid syntax (<string>, line 1)
+Traceback (most recent call last):
+  File "/Users/kamalsoni/Desktop/Work/Local AI/app.py", line 864, in ask_analyst
+    exec(exec_code, {}, local_vars)
+    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<string>", line 1
+    SELECT name, salary
+           ^^^^
+SyntaxError: invalid syntax
+
+2025-08-14 01:38:50,202 INFO httpx HTTP Request: POST http://localhost:11434/api/show "HTTP/1.1 200 OK"
+2025-08-14 01:38:51,931 INFO httpx HTTP Request: POST http://localhost:11434/api/chat "HTTP/1.1 200 OK"
+2025-08-14 01:44:45,858 ERROR __main__ Invalid database URI: Invalid SQLite URL: sqlite://test1.db
+Valid SQLite URL forms are:
+ sqlite:///:memory: (or, sqlite://)
+ sqlite:///relative/path/to/file.db
+ sqlite:////absolute/path/to/file.db
