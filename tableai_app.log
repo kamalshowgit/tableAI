@@ -133,3 +133,23 @@ Valid SQLite URL forms are:
  sqlite:///:memory: (or, sqlite://)
  sqlite:///relative/path/to/file.db
  sqlite:////absolute/path/to/file.db
+2025-08-14 01:58:32,141 INFO __main__ Saved uploaded file to temp path: /var/folders/nl/p7q82crd34527mnv_0stbnt80000gn/T/st_0540fc8f917946f8b2d671030aafda1e.xlsx
+2025-08-14 01:58:32,260 INFO __main__ DataFrame memory usage: 0.18 MB
+2025-08-14 01:58:32,359 INFO __main__ DataFrame memory usage: 0.18 MB
+2025-08-14 01:58:37,483 INFO __main__ DataFrame memory usage: 0.18 MB
+2025-08-14 01:58:37,623 INFO __main__ DataFrame memory usage: 0.18 MB
+2025-08-14 01:58:37,716 INFO __main__ DataFrame memory usage: 0.18 MB
+2025-08-14 01:58:39,544 INFO __main__ DataFrame memory usage: 0.18 MB
+2025-08-14 01:58:39,681 INFO __main__ DataFrame memory usage: 0.18 MB
+2025-08-14 01:58:39,767 INFO __main__ DataFrame memory usage: 0.18 MB
+2025-08-14 02:00:22,814 INFO __main__ DataFrame memory usage: 0.18 MB
+2025-08-14 02:00:22,893 INFO __main__ DataFrame memory usage: 0.18 MB
+2025-08-14 02:03:38,826 INFO __main__ Saved uploaded file to temp path: /var/folders/nl/p7q82crd34527mnv_0stbnt80000gn/T/st_b51f71d4a64d48828f15a11ac5141f05.xlsx
+2025-08-14 02:03:38,949 INFO __main__ DataFrame memory usage: 0.18 MB
+2025-08-14 02:03:39,045 INFO __main__ DataFrame memory usage: 0.18 MB
+2025-08-14 02:03:42,164 INFO __main__ DataFrame memory usage: 0.18 MB
+2025-08-14 02:03:42,300 INFO __main__ DataFrame memory usage: 0.18 MB
+2025-08-14 02:03:42,386 INFO __main__ DataFrame memory usage: 0.18 MB
+2025-08-14 02:03:49,836 INFO __main__ DataFrame memory usage: 0.18 MB
+2025-08-14 02:03:49,915 INFO __main__ DataFrame memory usage: 0.18 MB
+2025-08-14 02:03:49,971 INFO __main__ DataFrame memory usage: 0.18 MB
