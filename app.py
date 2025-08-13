@@ -884,12 +884,12 @@ def clean_ai_code(code: str) -> str:
 def save_and_get_temp_path(uploaded_file: Any) -> str:
     """Save uploaded file to temporary path with error handling."""
     try:
-        ext = os.path.splitext(uploaded_file.name)[-1]
-        temp_path = os.path.join(tempfile.gettempdir(), f"st_{uuid.uuid4().hex}{ext}")
-        with open(temp_path, "wb") as f:
-            f.write(uploaded_file.getbuffer())
-        logger.info(f"Saved uploaded file to temp path: {temp_path}")
-        return temp_path
+    ext = os.path.splitext(uploaded_file.name)[-1]
+    temp_path = os.path.join(tempfile.gettempdir(), f"st_{uuid.uuid4().hex}{ext}")
+    with open(temp_path, "wb") as f:
+        f.write(uploaded_file.getbuffer())
+    logger.info(f"Saved uploaded file to temp path: {temp_path}")
+    return temp_path
     except Exception as e:
         logger.error(f"Error saving uploaded file: {e}")
         st.error(f"❌ Error saving uploaded file: {e}")
@@ -915,7 +915,7 @@ def validate_ai_response(ai_response: Any) -> tuple[Optional[str], str]:
     elif "```sql" in str(ai_response):
         code = str(ai_response).split("```sql")[1].split("```", 1)[0].strip()
         return code, 'sql'
-    else:
+        else:
         # Try to detect if the response is a plain SQL query
         import re
         sql_pattern = r"^\s*SELECT .* FROM .*;?\s*$"
@@ -952,9 +952,9 @@ def render_analyst_output(ai_output: Any) -> None:
     # Handle string output
     if isinstance(ai_output, str):
         if 'File read detected:' in ai_output:
-            st.markdown(f"<div class='terminal-output'>{ai_output}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='terminal-output'>{ai_output}</div>", unsafe_allow_html=True)
         else:
-            st.markdown(f"<div class='terminal-output'>{ai_output}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='terminal-output'>{ai_output}</div>", unsafe_allow_html=True)
         return
     
     # Handle numeric output
@@ -1004,7 +1004,7 @@ def render_analyst_output(ai_output: Any) -> None:
         return
     
     # Default case - convert to string
-    st.markdown(f"<div class='terminal-output'>{str(ai_output)}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='terminal-output'>{str(ai_output)}</div>", unsafe_allow_html=True)
 
 # --- Enhanced Data Preview with Memory Management ---
 def render_data_preview_robust(df: pd.DataFrame, chunk_size: int):
@@ -1205,10 +1205,10 @@ if 'df_preview' not in st.session_state:
                     st.stop()
                 
                 st.success(f"✅ Connected successfully! Found {len(table_names)} table(s): {', '.join(table_names)}")
-                logger.info(f"Connected to DB: {db_type}, Tables: {table_names}")
+                    logger.info(f"Connected to DB: {db_type}, Tables: {table_names}")
                 
-                table = st.selectbox("Select Table", table_names)
-                if table:
+                        table = st.selectbox("Select Table", table_names)
+                        if table:
                     try:
                         # Load table data efficiently
                         import sqlalchemy
@@ -1217,21 +1217,21 @@ if 'df_preview' not in st.session_state:
                             sample_query = f"SELECT * FROM {table} LIMIT 1000"
                             df = pd.read_sql_query(sample_query, conn)
                         
-                        if df.empty:
+                            if df.empty:
                             st.warning("⚠️ Table is empty. Please select a different table.")
-                        else:
+                            else:
                             # Optimize DataFrame
                             df, chunk_size = optimize_dataframe(df)
                             
-                            st.session_state['df_preview'] = df.head()
-                            st.session_state['df_columns'] = list(df.columns)
-                            st.session_state['df_source'] = f"DB Table: {table}"
-                            st.session_state['data_db_uri'] = db_uri
-                            st.session_state['data_db_table'] = table
-                            st.session_state['data_source_type'] = 'db'
+                                st.session_state['df_preview'] = df.head()
+                                st.session_state['df_columns'] = list(df.columns)
+                                st.session_state['df_source'] = f"DB Table: {table}"
+                                st.session_state['data_db_uri'] = db_uri
+                                st.session_state['data_db_table'] = table
+                                st.session_state['data_source_type'] = 'db'
                             st.session_state['df_chunk_size'] = chunk_size
                             st.session_state['df_optimized'] = df
-                            st.rerun()
+                                st.rerun()
                     except Exception as table_error:
                         logger.error(f"Error reading table {table}: {table_error}")
                         st.error(f"❌ Error reading table '{table}': {table_error}")
@@ -1245,22 +1245,22 @@ if 'df_preview' in st.session_state:
     st.title("TableAI Data Preview")
     
     # Get the optimized DataFrame
-    if st.session_state.get('data_source_type') == 'file':
-        file_path = st.session_state.get('data_file_path')
-        if file_path:
+                if st.session_state.get('data_source_type') == 'file':
+                    file_path = st.session_state.get('data_file_path')
+                    if file_path:
             df, chunk_size = load_dataframe_from_temp_robust(file_path, max_size_mb=200)
-    elif st.session_state.get('data_source_type') == 'db':
-        db_uri = st.session_state.get('data_db_uri')
-        table = st.session_state.get('data_db_table')
-        if db_uri and table:
-            import sqlalchemy
-            engine = sqlalchemy.create_engine(db_uri)
+                elif st.session_state.get('data_source_type') == 'db':
+                    db_uri = st.session_state.get('data_db_uri')
+                    table = st.session_state.get('data_db_table')
+                    if db_uri and table:
+                        import sqlalchemy
+                        engine = sqlalchemy.create_engine(db_uri)
             with engine.connect() as conn:
                 sample_query = f"SELECT * FROM {table} LIMIT 10000"  # Limit for preview
                 df = pd.read_sql_query(sample_query, conn)
             df, chunk_size = optimize_dataframe(df)
-    else:
-        df = st.session_state.get('df_preview')
+                else:
+                    df = st.session_state.get('df_preview')
         chunk_size = st.session_state.get('df_chunk_size', 1000)
     
     if df is not None and not df.empty:
@@ -1295,16 +1295,16 @@ if st.session_state.get('show_analyst'):
         if file_path:
             df, chunk_size = load_dataframe_from_temp_robust(file_path, max_size_mb=200)
     elif st.session_state.get('data_source_type') == 'db':
-        db_uri = st.session_state.get('data_db_uri')
-        table = st.session_state.get('data_db_table')
-        if db_uri and table:
-            import sqlalchemy
-            engine = sqlalchemy.create_engine(db_uri)
-            with engine.connect() as conn:
+                        db_uri = st.session_state.get('data_db_uri')
+                        table = st.session_state.get('data_db_table')
+                            if db_uri and table:
+                                import sqlalchemy
+                                engine = sqlalchemy.create_engine(db_uri)
+                                with engine.connect() as conn:
                 sample_query = f"SELECT * FROM {table} LIMIT 10000"  # Limit for analysis
                 df = pd.read_sql_query(sample_query, conn)
             df, chunk_size = optimize_dataframe(df)
-    else:
+                                else:
         df = st.session_state.get('df_optimized', st.session_state.get('df_preview'))
         chunk_size = st.session_state.get('df_chunk_size', 1000)
     
