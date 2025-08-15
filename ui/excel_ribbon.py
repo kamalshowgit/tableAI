@@ -19,6 +19,7 @@ class ExcelRibbon(QWidget):
     analyzeDataRequested = pyqtSignal()
     toolsRequested = pyqtSignal()
     testComplexQueryRequested = pyqtSignal()
+    helpRequested = pyqtSignal()
     exportCsvRequested = pyqtSignal()
     exportExcelRequested = pyqtSignal()
     
@@ -77,6 +78,14 @@ class ExcelRibbon(QWidget):
             ("Clean Data", "Clean Data", None)
         ])
         menu_layout.addWidget(tools_menu)
+        
+        # Help dropdown menu
+        help_menu = self.create_dropdown_menu("Help", [
+            ("Function Reference", "Function Reference", self.helpRequested.emit),
+            ("User Guide", "User Guide", None),
+            ("About", "About", None)
+        ])
+        menu_layout.addWidget(help_menu)
         
         # Add stretch to push menus to the left
         menu_layout.addStretch()

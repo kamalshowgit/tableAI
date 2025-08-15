@@ -73,6 +73,7 @@ class ExcelAIAssistant(QMainWindow):
         self.ribbon.analyzeDataRequested.connect(self.analyze_data)
         self.ribbon.toolsRequested.connect(self.ask_ai_question)
         self.ribbon.testComplexQueryRequested.connect(self.test_complex_query)
+        self.ribbon.helpRequested.connect(self.show_help)
         
         # Connect export actions
         self.ribbon.exportCsvRequested.connect(lambda: self.export_data_format('csv'))
@@ -815,6 +816,12 @@ class ExcelAIAssistant(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Error applying complex operations: {str(e)}")
             self.statusBar().showMessage("Failed to apply complex operations")
+    
+    def show_help(self):
+        """Show the help dialog with function reference."""
+        from ui.dialogs import HelpDialog
+        help_dialog = HelpDialog(self)
+        help_dialog.exec_()
     
     def process_ai_question(self, question: str):
         """Process an AI question."""

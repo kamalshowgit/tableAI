@@ -940,3 +940,200 @@ class MultiStepApprovalDialog(QDialog):
             
             button_layout.addWidget(reject_btn)
             button_layout.addWidget(cancel_btn)
+
+class HelpDialog(QDialog):
+    """Comprehensive help dialog explaining all functions."""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.init_ui()
+        
+    def init_ui(self):
+        """Initialize the help dialog UI."""
+        self.setWindowTitle("Function Reference - AI Excel Assistant")
+        self.setGeometry(200, 100, 1000, 800)
+        self.setModal(True)
+        
+        layout = QVBoxLayout()
+        
+        # Title
+        title_label = QLabel("AI Excel Assistant - Function Reference")
+        title_label.setStyleSheet("""
+            QLabel {
+                font-size: 24px;
+                font-weight: bold;
+                color: #217346;
+                margin: 20px;
+                text-align: center;
+            }
+        """)
+        layout.addWidget(title_label)
+        
+        # Create scrollable content
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setStyleSheet("""
+            QScrollArea {
+                border: 1px solid #dee2e6;
+                border-radius: 8px;
+                background-color: white;
+            }
+        """)
+        
+        content_widget = QWidget()
+        content_layout = QVBoxLayout(content_widget)
+        
+        # File Operations Section
+        self.add_section(content_layout, "File Operations", [
+            ("Open", "Load Excel (.xlsx, .xls) or CSV files into the application. The file will be displayed in the main grid with proper column headers."),
+            ("Save", "Save the current data to the previously opened file. If no file was opened, this will prompt for a new file location."),
+            ("Save As", "Save the current data to a new file location. You can choose between Excel (.xlsx) and CSV formats."),
+            ("Export CSV", "Export the current data to a CSV file format. Useful for sharing data with other applications."),
+            ("Export Excel", "Export the current data to an Excel file format. Preserves formatting and data types.")
+        ])
+        
+        # Data Analysis Section
+        self.add_section(content_layout, "Data Analysis", [
+            ("Analyze Data", "Perform comprehensive analysis of your dataset including data structure, missing values, data types, and quality issues. Provides insights and transformation suggestions."),
+            ("AI Analysis", "Use natural language to ask questions about your data. The AI will understand your request and perform the appropriate Excel operations."),
+            ("Test Complex Query", "Execute multi-step data operations with step-by-step approval. Each step shows a preview and requires your approval before proceeding.")
+        ])
+        
+        # Data Processing Section
+        self.add_section(content_layout, "Data Processing", [
+            ("Filter", "Filter data based on specific criteria. Can be combined with other operations for complex data selection."),
+            ("Sort", "Sort data by one or more columns in ascending or descending order. Useful for identifying top performers or trends."),
+            ("Group By", "Group data by categories and calculate summary statistics like sum, average, count, maximum, and minimum."),
+            ("Calculate", "Perform mathematical operations on numeric columns including sum, average, count, and custom formulas."),
+            ("Remove Duplicates", "Identify and remove duplicate rows from your dataset to ensure data quality.")
+        ])
+        
+        # AI Features Section
+        self.add_section(content_layout, "AI Features", [
+            ("Natural Language Processing", "Ask questions in plain English like 'Show me sales above $1000' or 'What is the average salary by department?'"),
+            ("Automatic Code Generation", "The AI generates appropriate Python/pandas code for your requests, which you can review before execution."),
+            ("Smart Suggestions", "Receive intelligent suggestions for data transformations based on your data structure and common analysis patterns."),
+            ("Multi-Step Workflows", "Complex operations are broken down into manageable steps with previews and approval requirements.")
+        ])
+        
+        # Interface Features Section
+        self.add_section(content_layout, "Interface Features", [
+            ("Excel-like Grid", "Familiar spreadsheet interface with proper column headers, row numbers, and grid lines for easy data viewing."),
+            ("Column Headers", "Automatic detection and display of actual column names from your data files instead of generic A, B, C labels."),
+            ("Data Preview", "See how your data looks at each step of processing with live previews before applying changes."),
+            ("Status Updates", "Real-time feedback on operation progress and completion status in the status bar.")
+        ])
+        
+        # Workflow Section
+        self.add_section(content_layout, "Workflow Process", [
+            ("1. Load Data", "Start by opening an Excel or CSV file using the File menu. The data will appear in the main grid."),
+            ("2. Analyze Structure", "Use the Analyze Data function to understand your dataset and get transformation suggestions."),
+            ("3. Apply Transformations", "Review and approve suggested transformations, or use AI Analysis for custom operations."),
+            ("4. Preview Changes", "Each transformation shows a preview of the results before applying to your data."),
+            ("5. Export Results", "Save your processed data in Excel or CSV format for further use or sharing.")
+        ])
+        
+        # Tips Section
+        self.add_section(content_layout, "Tips for Best Results", [
+            ("Data Format", "Ensure your data has clear column headers in the first row for best AI analysis results."),
+            ("File Size", "Large files (over 100MB) may take longer to process. Consider splitting very large datasets."),
+            ("Column Names", "Use descriptive column names to help the AI understand your data structure better."),
+            ("Data Types", "The application automatically detects data types, but you can review and modify them if needed."),
+            ("Save Frequently", "Save your work regularly, especially after applying multiple transformations.")
+        ])
+        
+        # Troubleshooting Section
+        self.add_section(content_layout, "Troubleshooting", [
+            ("File Won't Open", "Check that the file format is supported (.xlsx, .xls, .csv) and the file isn't corrupted."),
+            ("AI Analysis Fails", "Ensure your question is clear and refers to columns that exist in your data."),
+            ("Slow Performance", "Large datasets may take time to process. Check the status bar for progress updates."),
+            ("Missing Data", "Use the Analyze Data function to identify missing values and data quality issues."),
+            ("Export Errors", "Ensure you have write permissions in the target directory and sufficient disk space.")
+        ])
+        
+        scroll_area.setWidget(content_widget)
+        layout.addWidget(scroll_area)
+        
+        # Close button
+        close_btn = QPushButton("Close")
+        close_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #6c757d;
+                color: white;
+                border: none;
+                padding: 12px 24px;
+                border-radius: 8px;
+                font-weight: bold;
+                font-size: 14px;
+                min-width: 100px;
+            }
+            QPushButton:hover {
+                background-color: #5a6268;
+            }
+        """)
+        close_btn.clicked.connect(self.accept)
+        
+        button_layout = QHBoxLayout()
+        button_layout.addStretch()
+        button_layout.addWidget(close_btn)
+        button_layout.addStretch()
+        layout.addLayout(button_layout)
+        
+        self.setLayout(layout)
+    
+    def add_section(self, parent_layout, title, items):
+        """Add a section with title and items to the help content."""
+        # Section title
+        section_title = QLabel(title)
+        section_title.setStyleSheet("""
+            QLabel {
+                font-size: 18px;
+                font-weight: bold;
+                color: #495057;
+                margin: 20px 0 10px 0;
+                padding: 10px;
+                background-color: #f8f9fa;
+                border-left: 4px solid #217346;
+                border-radius: 4px;
+            }
+        """)
+        parent_layout.addWidget(section_title)
+        
+        # Section items
+        for item_title, description in items:
+            item_widget = QWidget()
+            item_layout = QVBoxLayout(item_widget)
+            item_layout.setContentsMargins(20, 5, 20, 5)
+            
+            # Item title
+            item_title_label = QLabel(item_title)
+            item_title_label.setStyleSheet("""
+                QLabel {
+                    font-size: 14px;
+                    font-weight: bold;
+                    color: #217346;
+                    margin-bottom: 5px;
+                }
+            """)
+            item_layout.addWidget(item_title_label)
+            
+            # Item description
+            item_desc_label = QLabel(description)
+            item_desc_label.setWordWrap(True)
+            item_desc_label.setStyleSheet("""
+                QLabel {
+                    font-size: 12px;
+                    color: #6c757d;
+                    line-height: 1.4;
+                    margin-bottom: 10px;
+                }
+            """)
+            item_layout.addWidget(item_desc_label)
+            
+            parent_layout.addWidget(item_widget)
+        
+        # Add separator
+        separator = QFrame()
+        separator.setFrameShape(QFrame.HLine)
+        separator.setStyleSheet("background-color: #dee2e6; margin: 10px 0;")
+        parent_layout.addWidget(separator)
