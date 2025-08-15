@@ -480,12 +480,8 @@ class ExcelAIAssistant(QMainWindow):
         self.excel_table.setRowCount(rows)
         self.excel_table.setColumnCount(cols)
         
-        # Set headers
-        if cols <= 26:
-            column_headers = [chr(65 + i) for i in range(cols)]
-        else:
-            column_headers = [f"A{i+1}" for i in range(cols)]
-        
+        # Set headers using actual column names from DataFrame
+        column_headers = list(df.columns[:cols])
         self.excel_table.setHorizontalHeaderLabels(column_headers)
         
         # Populate table
@@ -502,6 +498,37 @@ class ExcelAIAssistant(QMainWindow):
         
         # Store the data for later use
         self.current_data = df
+        
+        # Also update the data preview table
+        self.update_data_table(df)
+    
+    def update_data_table(self, df: pd.DataFrame):
+        """Update the data preview table with data."""
+        if df is None or df.empty:
+            return
+        
+        # Update table dimensions
+        rows = min(len(df), 1000)
+        cols = min(len(df.columns), 26)
+        
+        self.data_table.setRowCount(rows)
+        self.data_table.setColumnCount(cols)
+        
+        # Set headers using actual column names from DataFrame
+        column_headers = list(df.columns[:cols])
+        self.data_table.setHorizontalHeaderLabels(column_headers)
+        
+        # Populate table
+        for i in range(rows):
+            for j in range(cols):
+                value = str(df.iloc[i, j])
+                if len(value) > 50:  # Truncate long values
+                    value = value[:47] + "..."
+                item = QTableWidgetItem(value)
+                self.data_table.setItem(i, j, item)
+        
+        # Resize columns to content
+        self.data_table.resizeColumnsToContents()
     
     def analyze_data(self):
         """Analyze the loaded data structure."""
