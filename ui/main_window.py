@@ -499,37 +499,6 @@ class ExcelAIAssistant(QMainWindow):
         
         # Store the data for later use
         self.current_data = df
-        
-        # Also update the data preview table
-        self.update_data_table(df)
-    
-    def update_data_table(self, df: pd.DataFrame):
-        """Update the data preview table with data."""
-        if df is None or df.empty:
-            return
-        
-        # Update table dimensions
-        rows = min(len(df), 1000)
-        cols = min(len(df.columns), 26)
-        
-        self.data_table.setRowCount(rows)
-        self.data_table.setColumnCount(cols)
-        
-        # Set headers using actual column names from DataFrame
-        column_headers = list(df.columns[:cols])
-        self.data_table.setHorizontalHeaderLabels(column_headers)
-        
-        # Populate table
-        for i in range(rows):
-            for j in range(cols):
-                value = str(df.iloc[i, j])
-                if len(value) > 50:  # Truncate long values
-                    value = value[:47] + "..."
-                item = QTableWidgetItem(value)
-                self.data_table.setItem(i, j, item)
-        
-        # Resize columns to content
-        self.data_table.resizeColumnsToContents()
     
     def analyze_data(self):
         """Analyze the loaded data structure."""
@@ -730,12 +699,10 @@ class ExcelAIAssistant(QMainWindow):
             success = self.data_processor.apply_transformation(suggestion)
             
             if success:
-                # Update the data table
-                self.update_data_table(self.data_processor.df_transformed)
-                
-                # Update file info
+                # Update the current data
                 df = self.data_processor.df_transformed
-                self.file_info_label.setText(f"{len(df)} rows × {len(df.columns)} columns (Processed)")
+                self.current_data = df
+                self.update_excel_grid(df)
                 
                 QMessageBox.information(self, "Success", f"Applied transformation: {suggestion['description']}")
                 self.statusBar().showMessage("Transformation applied successfully")
