@@ -74,6 +74,7 @@ class ExcelAIAssistant(QMainWindow):
         self.ribbon.toolsRequested.connect(self.ask_ai_question)
         self.ribbon.testComplexQueryRequested.connect(self.test_complex_query)
         self.ribbon.helpRequested.connect(self.show_help)
+        self.ribbon.aiSearchRequested.connect(self.process_ai_question)
         
         # Connect export actions
         self.ribbon.exportCsvRequested.connect(lambda: self.export_data_format('csv'))

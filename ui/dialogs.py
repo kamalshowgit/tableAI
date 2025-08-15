@@ -5,7 +5,7 @@ Dialog classes for AI Excel Assistant PyQt application.
 from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QTextEdit, 
                              QLabel, QPushButton, QCheckBox, QScrollArea,
                              QFrame, QGridLayout, QMessageBox, QTableWidget,
-                             QHeaderView)
+                             QHeaderView, QWidget)
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QFont, QPalette, QColor
 import pandas as pd

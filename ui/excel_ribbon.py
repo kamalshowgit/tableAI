@@ -5,7 +5,7 @@ Excel-like ribbon interface for AI Excel Assistant.
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, 
                              QLabel, QFrame, QGroupBox, QGridLayout,
                              QToolButton, QMenu, QAction, QFileDialog, QMessageBox,
-                             QMenuBar, QMainWindow)
+                             QMenuBar, QMainWindow, QLineEdit)
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QFont, QIcon, QPixmap
 
@@ -20,6 +20,7 @@ class ExcelRibbon(QWidget):
     toolsRequested = pyqtSignal()
     testComplexQueryRequested = pyqtSignal()
     helpRequested = pyqtSignal()
+    aiSearchRequested = pyqtSignal(str)
     exportCsvRequested = pyqtSignal()
     exportExcelRequested = pyqtSignal()
     
@@ -69,6 +70,10 @@ class ExcelRibbon(QWidget):
             ("Export Excel", "Export Excel", self.exportExcelRequested.emit)
         ])
         menu_layout.addWidget(file_menu)
+        
+        # AI Search Box
+        search_widget = self.create_search_box()
+        menu_layout.addWidget(search_widget)
         
         # Tools dropdown menu
         tools_menu = self.create_dropdown_menu("Tools", [
@@ -164,3 +169,54 @@ class ExcelRibbon(QWidget):
         menu_layout.addWidget(menu_btn)
         
         return menu_widget
+    
+    def create_search_box(self) -> QWidget:
+        """Create an AI search box for quick questions."""
+        search_widget = QWidget()
+        search_layout = QVBoxLayout(search_widget)
+        search_layout.setContentsMargins(0, 0, 0, 0)
+        search_layout.setSpacing(2)
+        
+        # Search label
+        search_label = QLabel("AI Search")
+        search_label.setStyleSheet("""
+            QLabel {
+                font-size: 10px;
+                font-weight: bold;
+                color: #495057;
+                text-align: center;
+                margin: 2px;
+            }
+        """)
+        search_layout.addWidget(search_label)
+        
+        # Search input box
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("Ask AI a question...")
+        self.search_input.setMaximumWidth(200)
+        self.search_input.setStyleSheet("""
+            QLineEdit {
+                border: 1px solid #c0c0c0;
+                border-radius: 4px;
+                padding: 6px 8px;
+                font-size: 11px;
+                background-color: white;
+            }
+            QLineEdit:focus {
+                border-color: #217346;
+                border-width: 2px;
+            }
+        """)
+        
+        # Connect enter key to search
+        self.search_input.returnPressed.connect(self.perform_search)
+        search_layout.addWidget(self.search_input)
+        
+        return search_widget
+    
+    def perform_search(self):
+        """Perform AI search when Enter is pressed."""
+        query = self.search_input.text().strip()
+        if query:
+            self.aiSearchRequested.emit(query)
+            self.search_input.clear()
