@@ -4,7 +4,8 @@ Dialog classes for AI Excel Assistant PyQt application.
 
 from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QTextEdit, 
                              QLabel, QPushButton, QCheckBox, QScrollArea,
-                             QFrame, QGridLayout, QMessageBox)
+                             QFrame, QGridLayout, QMessageBox, QTableWidget,
+                             QHeaderView)
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QFont, QPalette, QColor
 import pandas as pd
@@ -477,3 +478,465 @@ Examples:
             self.accept()
         else:
             QMessageBox.warning(self, "Warning", "Please enter a question.")
+
+class MultiStepApprovalDialog(QDialog):
+    """Dialog for multi-step operations with previews and approvals."""
+    
+    allStepsApproved = pyqtSignal(list)
+    workflowCancelled = pyqtSignal()
+    
+    def __init__(self, df: pd.DataFrame, steps: list, parent=None):
+        super().__init__(parent)
+        self.df = df
+        self.steps = steps
+        self.current_step = 0
+        self.approved_steps = []
+        self.init_ui()
+        
+    def init_ui(self):
+        """Initialize the dialog UI."""
+        self.setWindowTitle("Multi-Step Operation Approval")
+        self.setGeometry(400, 300, 900, 700)
+        self.setModal(True)
+        
+        layout = QVBoxLayout()
+        
+        # Progress indicator
+        progress_label = QLabel(f"Step {self.current_step + 1} of {len(self.steps)}")
+        progress_label.setStyleSheet("""
+            QLabel {
+                font-size: 16px;
+                font-weight: bold;
+                color: #217346;
+                margin: 10px;
+                text-align: center;
+            }
+        """)
+        layout.addWidget(progress_label)
+        
+        # Current step info
+        if self.steps:
+            current_step_info = self.steps[self.current_step]
+            step_name_label = QLabel(f"Operation: {current_step_info.get('name', 'Unknown')}")
+            step_name_label.setStyleSheet("""
+                QLabel {
+                    font-size: 18px;
+                    font-weight: bold;
+                    color: #495057;
+                    margin: 10px;
+                    padding: 10px;
+                    background-color: #f8f9fa;
+                    border-radius: 8px;
+                }
+            """)
+            layout.addWidget(step_name_label)
+            
+            # Description
+            desc_label = QLabel("Description:")
+            desc_label.setStyleSheet("font-weight: bold; margin-top: 15px; font-size: 14px;")
+            layout.addWidget(desc_label)
+            
+            desc_text = QLabel(current_step_info.get('description', 'No description available'))
+            desc_text.setWordWrap(True)
+            desc_text.setStyleSheet("""
+                QLabel {
+                    margin: 5px; 
+                    padding: 15px; 
+                    background-color: #f8f9fa; 
+                    border: 1px solid #dee2e6; 
+                    border-radius: 8px;
+                    font-size: 13px;
+                    line-height: 1.4;
+                }
+            """)
+            layout.addWidget(desc_text)
+            
+            # Code preview
+            code_label = QLabel("Generated Code:")
+            code_label.setStyleSheet("font-weight: bold; margin-top: 20px; font-size: 14px;")
+            layout.addWidget(code_label)
+            
+            code_text = QTextEdit()
+            code_text.setPlainText(current_step_info.get('code', 'No code available'))
+            code_text.setMaximumHeight(120)
+            code_text.setStyleSheet("""
+                QTextEdit {
+                    background-color: #2d3748;
+                    color: #00ff88;
+                    border: 1px solid #4a5568;
+                    border-radius: 8px;
+                    font-family: 'Courier New', monospace;
+                    font-size: 12px;
+                    padding: 15px;
+                    selection-background-color: #4a5568;
+                }
+            """)
+            code_text.setReadOnly(True)
+            layout.addWidget(code_text)
+            
+            # Data preview
+            preview_label = QLabel("Data Preview (First 10 rows):")
+            preview_label.setStyleSheet("font-weight: bold; margin-top: 20px; font-size: 14px;")
+            layout.addWidget(preview_label)
+            
+            # Create preview table
+            self.preview_table = QTableWidget()
+            self.preview_table.setMaximumHeight(200)
+            self.preview_table.setStyleSheet("""
+                QTableWidget {
+                    gridline-color: #dee2e6;
+                    background-color: white;
+                    alternate-background-color: #f8f9fa;
+                }
+                QHeaderView::section {
+                    background-color: #e9ecef;
+                    padding: 6px;
+                    border: 1px solid #dee2e6;
+                    font-weight: bold;
+                }
+            """)
+            self.preview_table.setAlternatingRowColors(True)
+            self._update_preview_table()
+            layout.addWidget(self.preview_table)
+        
+        # Approval checkbox
+        self.approve_checkbox = QCheckBox("Approve this step for execution")
+        self.approve_checkbox.setChecked(True)
+        self.approve_checkbox.setStyleSheet("""
+            QCheckBox {
+                margin: 20px 0; 
+                font-weight: bold; 
+                font-size: 14px;
+                color: #217346;
+            }
+            QCheckBox::indicator {
+                width: 20px;
+                height: 20px;
+            }
+        """)
+        layout.addWidget(self.approve_checkbox)
+        
+        # Buttons
+        button_layout = QHBoxLayout()
+        
+        if self.current_step < len(self.steps) - 1:
+            next_btn = QPushButton("Approve & Continue to Next Step")
+            next_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #28a745;
+                    color: white;
+                    border: none;
+                    padding: 12px 24px;
+                    border-radius: 8px;
+                    font-weight: bold;
+                    font-size: 14px;
+                    min-width: 200px;
+                }
+                QPushButton:hover {
+                    background-color: #218838;
+                }
+                QPushButton:pressed {
+                    background-color: #1e7e34;
+                }
+            """)
+            next_btn.clicked.connect(self.next_step)
+            button_layout.addWidget(next_btn)
+        else:
+            finish_btn = QPushButton("Approve & Finish All Steps")
+            finish_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #28a745;
+                    color: white;
+                    border: none;
+                    padding: 12px 24px;
+                    border-radius: 8px;
+                    font-weight: bold;
+                    font-size: 14px;
+                    min-width: 200px;
+                }
+                QPushButton:hover {
+                    background-color: #218838;
+                }
+                QPushButton:pressed {
+                    background-color: #1e7e34;
+                }
+            """)
+            finish_btn.clicked.connect(self.finish_all_steps)
+            button_layout.addWidget(finish_btn)
+        
+        reject_btn = QPushButton("Reject Step")
+        reject_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #dc3545;
+                color: white;
+                border: none;
+                padding: 12px 24px;
+                border-radius: 8px;
+                font-weight: bold;
+                font-size: 14px;
+                min-width: 120px;
+            }
+            QPushButton:hover {
+                background-color: #c82333;
+            }
+            QPushButton:pressed {
+                background-color: #bd2130;
+            }
+        """)
+        reject_btn.clicked.connect(self.reject_step)
+        
+        cancel_btn = QPushButton("Cancel All")
+        cancel_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #6c757d;
+                color: white;
+                border: none;
+                padding: 12px 24px;
+                border-radius: 8px;
+                font-weight: bold;
+                font-size: 14px;
+                min-width: 120px;
+            }
+            QPushButton:hover {
+                background-color: #5a6268;
+            }
+        """)
+        cancel_btn.clicked.connect(self.cancel_workflow)
+        
+        button_layout.addWidget(reject_btn)
+        button_layout.addWidget(cancel_btn)
+        layout.addLayout(button_layout)
+        
+        self.setLayout(layout)
+    
+    def _update_preview_table(self):
+        """Update the preview table with current data."""
+        if not self.steps or self.current_step >= len(self.steps):
+            return
+            
+        # Get the preview data for current step
+        preview_data = self.steps[self.current_step].get('preview_data', self.df)
+        
+        if preview_data is None or preview_data.empty:
+            return
+            
+        # Update table dimensions
+        rows = min(len(preview_data), 10)
+        cols = min(len(preview_data.columns), 10)
+        
+        self.preview_table.setRowCount(rows)
+        self.preview_table.setColumnCount(cols)
+        
+        # Set headers
+        column_headers = list(preview_data.columns[:cols])
+        self.preview_table.setHorizontalHeaderLabels(column_headers)
+        
+        # Populate table
+        for i in range(rows):
+            for j in range(cols):
+                value = str(preview_data.iloc[i, j])
+                if len(value) > 30:  # Truncate long values
+                    value = value[:27] + "..."
+                item = QTableWidgetItem(value)
+                self.preview_table.setItem(i, j, item)
+        
+        # Resize columns
+        self.preview_table.resizeColumnsToContents()
+    
+    def next_step(self):
+        """Move to the next step."""
+        if self.approve_checkbox.isChecked():
+            # Store approved step
+            current_step_info = self.steps[self.current_step].copy()
+            current_step_info['approved'] = True
+            self.approved_steps.append(current_step_info)
+            
+            # Move to next step
+            self.current_step += 1
+            
+            # Update UI for next step
+            self._update_ui_for_step()
+        else:
+            QMessageBox.warning(self, "Warning", "Please approve this step before continuing.")
+    
+    def finish_all_steps(self):
+        """Finish all steps and emit signal."""
+        if self.approve_checkbox.isChecked():
+            # Store last approved step
+            current_step_info = self.steps[self.current_step].copy()
+            current_step_info['approved'] = True
+            self.approved_steps.append(current_step_info)
+            
+            # Emit signal with all approved steps
+            self.allStepsApproved.emit(self.approved_steps)
+            self.accept()
+        else:
+            QMessageBox.warning(self, "Warning", "Please approve this step before finishing.")
+    
+    def reject_step(self):
+        """Reject current step and continue."""
+        QMessageBox.information(self, "Step Rejected", f"Step '{self.steps[self.current_step].get('name', 'Unknown')}' has been rejected and will be skipped.")
+        
+        # Move to next step without approval
+        self.current_step += 1
+        
+        if self.current_step >= len(self.steps):
+            # All steps processed
+            self.allStepsApproved.emit(self.approved_steps)
+            self.accept()
+        else:
+            # Update UI for next step
+            self._update_ui_for_step()
+    
+    def cancel_workflow(self):
+        """Cancel the entire workflow."""
+        reply = QMessageBox.question(
+            self, 
+            "Cancel Workflow", 
+            "Are you sure you want to cancel all steps?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+        
+        if reply == QMessageBox.Yes:
+            self.workflowCancelled.emit()
+            self.reject()
+    
+    def _update_ui_for_step(self):
+        """Update the UI for the current step."""
+        if self.current_step >= len(self.steps):
+            return
+            
+        # Update progress label
+        progress_label = self.findChild(QLabel, "")
+        if progress_label:
+            progress_label.setText(f"Step {self.current_step + 1} of {len(self.steps)}")
+        
+        # Update step info
+        current_step_info = self.steps[self.current_step]
+        
+        # Update step name
+        step_name_labels = self.findChildren(QLabel)
+        for label in step_name_labels:
+            if "Operation:" in label.text():
+                label.setText(f"Operation: {current_step_info.get('name', 'Unknown')}")
+                break
+        
+        # Update description
+        for label in step_name_labels:
+            if label.text() == "Description:":
+                # Find the next label which should be the description
+                parent_layout = label.parent().layout()
+                for i in range(parent_layout.count()):
+                    item = parent_layout.itemAt(i)
+                    if item.widget() == label:
+                        if i + 1 < parent_layout.count():
+                            desc_widget = parent_layout.itemAt(i + 1).widget()
+                            if isinstance(desc_widget, QLabel):
+                                desc_widget.setText(current_step_info.get('description', 'No description available'))
+                        break
+                break
+        
+        # Update code
+        code_texts = self.findChildren(QTextEdit)
+        for code_text in code_texts:
+            code_text.setPlainText(current_step_info.get('code', 'No code available'))
+            break
+        
+        # Update preview table
+        self._update_preview_table()
+        
+        # Update buttons
+        button_layout = self.findChild(QHBoxLayout)
+        if button_layout:
+            # Clear existing buttons
+            for i in reversed(range(button_layout.count())):
+                button_layout.itemAt(i).widget().setParent(None)
+            
+            # Add new buttons
+            if self.current_step < len(self.steps) - 1:
+                next_btn = QPushButton("Approve & Continue to Next Step")
+                next_btn.setStyleSheet("""
+                    QPushButton {
+                        background-color: #28a745;
+                        color: white;
+                        border: none;
+                        padding: 12px 24px;
+                        border-radius: 8px;
+                        font-weight: bold;
+                        font-size: 14px;
+                        min-width: 200px;
+                    }
+                    QPushButton:hover {
+                        background-color: #218838;
+                    }
+                    QPushButton:pressed {
+                        background-color: #1e7e34;
+                    }
+                """)
+                next_btn.clicked.connect(self.next_step)
+                button_layout.addWidget(next_btn)
+            else:
+                finish_btn = QPushButton("Approve & Finish All Steps")
+                finish_btn.setStyleSheet("""
+                    QPushButton {
+                        background-color: #28a745;
+                        color: white;
+                        border: none;
+                        padding: 12px 24px;
+                        border-radius: 8px;
+                        font-weight: bold;
+                        font-size: 14px;
+                        min-width: 200px;
+                    }
+                    QPushButton:hover {
+                        background-color: #218838;
+                    }
+                    QPushButton:pressed {
+                        background-color: #1e7e34;
+                    }
+                """)
+                finish_btn.clicked.connect(self.finish_all_steps)
+                button_layout.addWidget(finish_btn)
+            
+            reject_btn = QPushButton("Reject Step")
+            reject_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #dc3545;
+                    color: white;
+                    border: none;
+                    padding: 12px 24px;
+                    border-radius: 8px;
+                    font-weight: bold;
+                    font-size: 14px;
+                    min-width: 120px;
+                }
+                QPushButton:hover {
+                    background-color: #c82333;
+                }
+                QPushButton:pressed {
+                    background-color: #bd2130;
+                }
+            """)
+            reject_btn.clicked.connect(self.reject_step)
+            
+            cancel_btn = QPushButton("Cancel All")
+            cancel_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #6c757d;
+                    color: white;
+                    border: none;
+                    padding: 12px 24px;
+                    border-radius: 8px;
+                    font-weight: bold;
+                    font-size: 14px;
+                    min-width: 120px;
+                }
+                QPushButton:hover {
+                    background-color: #5a6268;
+                }
+            """)
+            cancel_btn.clicked.connect(self.cancel_workflow)
+            
+            button_layout.addWidget(reject_btn)
+            button_layout.addWidget(cancel_btn)

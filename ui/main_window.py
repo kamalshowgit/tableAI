@@ -72,6 +72,7 @@ class ExcelAIAssistant(QMainWindow):
         self.ribbon.fileSaveAsRequested.connect(self.save_file_as)
         self.ribbon.analyzeDataRequested.connect(self.analyze_data)
         self.ribbon.toolsRequested.connect(self.ask_ai_question)
+        self.ribbon.testComplexQueryRequested.connect(self.test_complex_query)
         
         # Connect export actions
         self.ribbon.exportCsvRequested.connect(lambda: self.export_data_format('csv'))
@@ -754,6 +755,99 @@ class ExcelAIAssistant(QMainWindow):
         dialog = AIQuestionDialog(self)
         dialog.questionSubmitted.connect(self.process_ai_question)
         dialog.exec_()
+    
+    def test_complex_query(self):
+        """Test a complex query that requires multiple previews and approvals."""
+        if not hasattr(self, 'current_data') or self.current_data is None:
+            QMessageBox.warning(self, "Warning", "Please load a file first.")
+            return
+        
+        # Create a complex multi-step operation
+        complex_steps = [
+            {
+                'name': 'Data Filtering',
+                'description': 'Filter the data to show only records that meet specific criteria. This step will reduce the dataset size for better analysis.',
+                'code': 'filtered_df = df[df["column_name"] > threshold_value]',
+                'preview_data': self.current_data.head(10)  # Show first 10 rows as preview
+            },
+            {
+                'name': 'Data Sorting',
+                'description': 'Sort the filtered data by a specific column in descending order to identify top performers or highest values.',
+                'code': 'sorted_df = filtered_df.sort_values(by="sort_column", ascending=False)',
+                'preview_data': self.current_data.head(10)  # Show preview of what sorting would look like
+            },
+            {
+                'name': 'Data Aggregation',
+                'description': 'Group the sorted data by categories and calculate summary statistics like sum, average, and count for each group.',
+                'code': 'grouped_df = sorted_df.groupby("group_column").agg({\n    "value_column": ["sum", "mean", "count"]\n}).round(2)',
+                'preview_data': self.current_data.head(10)  # Show preview of grouping structure
+            },
+            {
+                'name': 'Final Formatting',
+                'description': 'Format the final results with proper column names, reset index, and apply final styling for presentation.',
+                'code': 'final_df = grouped_df.reset_index()\nfinal_df.columns = ["Category", "Total", "Average", "Count"]\nfinal_df = final_df.sort_values("Total", ascending=False)',
+                'preview_data': self.current_data.head(10)  # Show final formatted preview
+            }
+        ]
+        
+        # Show the multi-step approval dialog
+        from ui.dialogs import MultiStepApprovalDialog
+        workflow_dialog = MultiStepApprovalDialog(self.current_data, complex_steps, self)
+        workflow_dialog.allStepsApproved.connect(self.apply_complex_operations)
+        workflow_dialog.workflowCancelled.connect(lambda: self.statusBar().showMessage("Complex query workflow cancelled"))
+        
+        if workflow_dialog.exec_() == QDialog.Accepted:
+            self.statusBar().showMessage("Complex query workflow completed successfully")
+        else:
+            self.statusBar().showMessage("Complex query workflow cancelled")
+    
+    def apply_complex_operations(self, approved_steps: list):
+        """Apply all approved complex operations."""
+        try:
+            self.statusBar().showMessage("Applying complex operations...")
+            
+            # Simulate applying the operations
+            result_df = self.current_data.copy()
+            operation_log = []
+            
+            for i, step in enumerate(approved_steps):
+                step_name = step.get('name', f'Step {i+1}')
+                operation_log.append(f"Applied: {step_name}")
+                
+                # Simulate data transformation (in real implementation, this would execute the actual code)
+                if step['name'] == 'Data Filtering':
+                    # Simulate filtering - take first 50% of rows
+                    result_df = result_df.iloc[:len(result_df)//2].copy()
+                elif step['name'] == 'Data Sorting':
+                    # Simulate sorting - sort by first column
+                    if len(result_df.columns) > 0:
+                        result_df = result_df.sort_values(by=result_df.columns[0]).copy()
+                elif step['name'] == 'Data Aggregation':
+                    # Simulate aggregation - group by first column and count
+                    if len(result_df.columns) > 0:
+                        result_df = result_df.groupby(result_df.columns[0]).size().reset_index(name='Count')
+                elif step['name'] == 'Final Formatting':
+                    # Simulate formatting - add some styling info
+                    result_df = result_df.copy()
+                    result_df['Processed'] = 'Yes'
+            
+            # Update the current data
+            self.current_data = result_df
+            self.update_excel_grid(result_df)
+            
+            # Show success message
+            QMessageBox.information(
+                self, 
+                "Complex Operations Applied", 
+                f"Successfully applied {len(approved_steps)} operations!\n\nOperations applied:\n" + 
+                "\n".join([f"• {step.get('name', 'Unknown')}" for step in approved_steps])
+            )
+            
+            self.statusBar().showMessage(f"Applied {len(approved_steps)} complex operations successfully")
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Error applying complex operations: {str(e)}")
+            self.statusBar().showMessage("Failed to apply complex operations")
     
     def process_ai_question(self, question: str):
         """Process an AI question."""

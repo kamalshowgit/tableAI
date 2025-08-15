@@ -18,6 +18,7 @@ class ExcelRibbon(QWidget):
     fileSaveAsRequested = pyqtSignal()
     analyzeDataRequested = pyqtSignal()
     toolsRequested = pyqtSignal()
+    testComplexQueryRequested = pyqtSignal()
     exportCsvRequested = pyqtSignal()
     exportExcelRequested = pyqtSignal()
     
@@ -71,6 +72,7 @@ class ExcelRibbon(QWidget):
         # Tools dropdown menu
         tools_menu = self.create_dropdown_menu("Tools", [
             ("AI Analysis", "AI Analysis", self.toolsRequested.emit),
+            ("Test Complex Query", "Test Complex Query", self.testComplexQueryRequested.emit),
             ("Validate Data", "Validate Data", None),
             ("Clean Data", "Clean Data", None)
         ])
