@@ -39,12 +39,26 @@ class ExcelRibbon(QWidget):
         
         layout.addWidget(self.menu_ribbon)
         
+        # Set ribbon background and styling
+        self.setStyleSheet("""
+            QWidget {
+                background-color: #f8f9fa;
+            }
+        """)
+        
     def create_menu_ribbon(self):
         """Create Windows-style dropdown menu ribbon."""
         self.menu_ribbon = QWidget()
+        self.menu_ribbon.setStyleSheet("""
+            QWidget {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #217346, stop:1 #1a5c3a);
+                border-bottom: 2px solid #155a2e;
+            }
+        """)
         menu_layout = QHBoxLayout(self.menu_ribbon)
-        menu_layout.setContentsMargins(5, 5, 5, 5)
-        menu_layout.setSpacing(10)
+        menu_layout.setContentsMargins(15, 12, 15, 12)
+        menu_layout.setSpacing(15)
         
         # Home dropdown menu
         home_menu = self.create_dropdown_menu("Home", [
@@ -106,22 +120,24 @@ class ExcelRibbon(QWidget):
         menu_btn = QPushButton(title)
         menu_btn.setStyleSheet("""
             QPushButton {
-                background-color: #f0f0f0;
-                color: #333333;
-                border: 1px solid #c0c0c0;
-                border-radius: 3px;
-                padding: 8px 16px;
+                background-color: rgba(255, 255, 255, 0.9);
+                color: #217346;
+                border: 2px solid rgba(255, 255, 255, 0.3);
+                border-radius: 6px;
+                padding: 10px 18px;
                 font-weight: bold;
-                font-size: 11px;
-                min-width: 80px;
+                font-size: 12px;
+                min-width: 90px;
                 text-align: center;
             }
             QPushButton:hover {
-                background-color: #e0e0e0;
-                border-color: #a0a0a0;
+                background-color: rgba(255, 255, 255, 1.0);
+                border-color: rgba(255, 255, 255, 0.6);
+                transform: translateY(-1px);
             }
             QPushButton:pressed {
-                background-color: #d0d0d0;
+                background-color: rgba(255, 255, 255, 0.8);
+                transform: translateY(0px);
             }
         """)
         
@@ -130,24 +146,27 @@ class ExcelRibbon(QWidget):
         dropdown_menu.setStyleSheet("""
             QMenu {
                 background-color: #ffffff;
-                border: 1px solid #c0c0c0;
-                border-radius: 3px;
-                padding: 5px;
+                border: 2px solid #217346;
+                border-radius: 8px;
+                padding: 8px;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
             }
             QMenu::item {
-                padding: 8px 20px;
-                border-radius: 2px;
-                color: #333333;
+                padding: 10px 24px;
+                border-radius: 6px;
+                color: #495057;
                 background-color: transparent;
+                font-size: 12px;
+                font-weight: 500;
             }
             QMenu::item:selected {
-                background-color: #0078d4;
+                background-color: #217346;
                 color: white;
             }
             QMenu::separator {
                 height: 1px;
-                background-color: #e0e0e0;
-                margin: 5px 0px;
+                background-color: #e9ecef;
+                margin: 8px 0px;
             }
         """)
         
@@ -175,17 +194,21 @@ class ExcelRibbon(QWidget):
         search_widget = QWidget()
         search_layout = QVBoxLayout(search_widget)
         search_layout.setContentsMargins(0, 0, 0, 0)
-        search_layout.setSpacing(2)
+        search_layout.setSpacing(3)
         
         # Search label
         search_label = QLabel("AI Search")
         search_label.setStyleSheet("""
             QLabel {
-                font-size: 10px;
+                font-size: 11px;
                 font-weight: bold;
-                color: #495057;
+                color: #217346;
                 text-align: center;
                 margin: 2px;
+                background-color: #f8f9fa;
+                padding: 4px 8px;
+                border-radius: 4px;
+                border: 1px solid #e9ecef;
             }
         """)
         search_layout.addWidget(search_label)
@@ -193,18 +216,26 @@ class ExcelRibbon(QWidget):
         # Search input box
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Ask AI a question...")
-        self.search_input.setMaximumWidth(200)
+        self.search_input.setMaximumWidth(220)
+        self.search_input.setMinimumHeight(28)
         self.search_input.setStyleSheet("""
             QLineEdit {
-                border: 1px solid #c0c0c0;
-                border-radius: 4px;
-                padding: 6px 8px;
-                font-size: 11px;
+                border: 2px solid #dee2e6;
+                border-radius: 6px;
+                padding: 8px 12px;
+                font-size: 12px;
                 background-color: white;
+                color: #333333;
+                font-weight: 500;
             }
             QLineEdit:focus {
                 border-color: #217346;
                 border-width: 2px;
+                background-color: #f8f9fa;
+            }
+            QLineEdit::placeholder {
+                color: #6c757d;
+                font-style: italic;
             }
         """)
         
